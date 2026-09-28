@@ -89,3 +89,9 @@ def test_no_go_prompt_without_a_question_or_when_already_continuing(monkeypatch,
     assert drive(monkeypatch, capsys, ev, [], {"BUSYBAR_GO": "1"})[1][0][1] == "done"
     ev = event(tmp_path, hook_event_name="Stop", stop_hook_active=True, last_assistant_message="More?")
     assert drive(monkeypatch, capsys, ev, [], {"BUSYBAR_GO": "1"})[1][0][1] == "done"
+
+
+def test_auto_mode_denial_raises_a_hand(monkeypatch, capsys, tmp_path):
+    ev = event(tmp_path, hook_event_name="PermissionDenied", tool_name="Bash", tool_input={"command": "rm -rf build"}, reason="[Irreversible Local Destruction]")
+    out, calls = drive(monkeypatch, capsys, ev, [])
+    assert out is None and calls[0][1] == "raise" and "blocked" in calls[0]

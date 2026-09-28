@@ -5,6 +5,7 @@ Standard library only. Never blocks Claude on a missing bar or CLI.
 
   SessionStart (startup, resume)             hello
   Notification (permission, idle, input)     raise
+  PermissionDenied (auto mode blocked a call)  raise
   UserPromptSubmit, SessionEnd               lower
   Stop                                       done; BUSYBAR_GO=1: GO? on the wheel after a question
   PermissionRequest, BUSYBAR_ASK=1           ALLOW? on the wheel, decision returned
@@ -117,6 +118,8 @@ def main() -> int:
         reason = REASONS.get(event.get("notification_type", ""))
         if reason:
             run(cmd + ["raise", *common, "--reason", reason], timeout=15)
+    elif name == "PermissionDenied":
+        run(cmd + ["raise", *common, "--reason", "blocked"], timeout=15)
     elif name in ("UserPromptSubmit", "SessionEnd"):
         run(cmd + ["lower", *common], timeout=15)
     elif name == "Stop":

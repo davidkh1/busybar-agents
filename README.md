@@ -49,7 +49,8 @@ Optional: `uv tool install git+https://github.com/davidkh1/busybar-agents`
 puts `busybar-agents` on your PATH. For one session only:
 `claude --plugin-dir ./busybar-agents/adapters/claude-code`.
 
-Permission screens need the default permission mode; auto mode never prompts.
+In auto mode Claude approves tools itself, so the permission hand is rare;
+everything else works, and a call the classifier blocks raises a hand too.
 
 ## Claude Code events
 
@@ -58,6 +59,7 @@ Permission screens need the default permission mode; auto mode never prompts.
 | `SessionStart` | `CLAUDE / ready` |
 | `Notification` permission prompt | `CLAUDE / permission? - session`, arm up |
 | `Notification` idle, subagent input, elicitation | `CLAUDE / your turn - session` or `input? - session`, arm up |
+| `PermissionDenied`, auto mode | `CLAUDE / blocked - session`, arm up |
 | `UserPromptSubmit`, `SessionEnd` | arm down |
 | `Stop` | `DONE / session` |
 | `PermissionRequest`, `BUSYBAR_ASK=1` | `ALLOW? / Bash: npm test`, the wheel decides |

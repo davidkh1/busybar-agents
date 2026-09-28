@@ -17,8 +17,9 @@
 
 A small USB desk gadget that does something cute when your agents need you.
 Claude Code waits for permission or for your answer: the bar shows its mascot
-with an arm up and blinks its LEDs. You reply, the arm comes down. The turn
-ends, it smiles. Turn the wheel to approve a tool call without the keyboard.
+with an arm up, blinks its LEDs, and plays a chime if you turn sound on. You
+reply, the arm comes down. The turn ends, it smiles. Turn the wheel to
+approve a tool call without the keyboard.
 
 | | |
 | --- | --- |
@@ -75,7 +76,7 @@ Same hands, same wheel. `install.py --uninstall` removes them.
 | `BUSYBAR_ADDR` | `10.0.4.20` | The bar's fixed USB address, or its Wi-Fi address |
 | `BUSYBAR_TOKEN` | unset | Access key, Wi-Fi only |
 | `BUSYBAR_PRIORITY` | `50` | `91` or more overrides a running focus session |
-| `BUSYBAR_SOUND` | off | `1` for a chime on hand up |
+| `BUSYBAR_SOUND` | off | `1` plays the bar's reminder chime when a hand goes up; or a stock sound name (`event`, `reminder`) |
 | `BUSYBAR_ASK` | off | `1`: permissions and questions on the wheel |
 | `BUSYBAR_GO` | off | `1`: go ahead on the wheel after a question |
 

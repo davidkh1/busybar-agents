@@ -38,7 +38,8 @@ ln -s "$PWD/busybar-agents/adapters/claude-code" ~/.claude/skills/busybar-agents
 claude
 ```
 
-Needs [uv](https://docs.astral.sh/uv/). Linux and macOS.
+Needs [uv](https://docs.astral.sh/uv/). Linux and macOS. That is all;
+everything below is optional.
 
 The hand goes up when Claude needs permission, waits for you, needs input,
 or auto mode blocks a call. It comes down when you type. Every turn ends
@@ -47,9 +48,14 @@ the folder.
 
 ## The wheel
 
+Want to answer from the bar instead of the keyboard? Start Claude with the
+two switches on:
+
 ```bash
 BUSYBAR_ASK=1 BUSYBAR_GO=1 claude
 ```
+
+Export them in your shell profile and the command stays plain `claude`.
 
 | Claude asks | Bar shows | Wheel |
 | --- | --- | --- |

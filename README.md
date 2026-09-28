@@ -121,9 +121,13 @@ busybar-agents status
 busybar-agents clear
 ```
 
-One hand per `agent` and `session` pair. Raising the same pair again replaces
-it; several pairs share the strip. Hands older than `BUSYBAR_TTL` are dropped,
-so a session that died without lowering its hand does not stay up all day.
+One hand per `agent` and `session` pair, so several Claude Code sessions, or
+Claude next to another agent, share the strip: two hands show as `2 AGENTS`
+over the project names, lowering one redraws the other, and a finished turn
+shows DONE only when nobody else is waiting. Hands older than `BUSYBAR_TTL`
+are dropped, so a session that died without lowering its hand does not stay
+up all day. The one thing not shared is the wheel: with `BUSYBAR_ASK=1` in
+two sessions at once, a gesture answers whichever asked first.
 
 ## Configuration
 

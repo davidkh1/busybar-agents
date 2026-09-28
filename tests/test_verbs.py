@@ -71,3 +71,12 @@ def test_hello_can_be_switched_off(tmp_path):
     bar, hands = FakeBar(), HandsFile(tmp_path / "h.json")
     run(hands, bar, "hello", "--agent", "claude", cfg=Config(hello_seconds=0))
     assert bar.calls == []
+
+
+def test_done_keeps_the_board_when_another_session_is_waiting(tmp_path):
+    bar, hands = FakeBar(), HandsFile(tmp_path / "h.json")
+    run(hands, bar, "raise", "--agent", "claude", "--session", "a", "--project", "api", "--reason", "permission?")
+    run(hands, bar, "raise", "--agent", "claude", "--session", "b", "--project", "web", "--reason", "your turn")
+    run(hands, bar, "done", "--agent", "claude", "--session", "a", "--project", "api")
+    assert bar.calls[-1] == ("draw", ["CLAUDE", "your turn"])
+    assert [h.session for h in hands.load()] == ["b"]

@@ -82,9 +82,12 @@ async def perform(args: argparse.Namespace, cfg: Config, hands_file: HandsFile, 
         else:
             await bar.clear()
     elif args.command == "done":
-        hands_file.take(args.agent, args.session)
-        hand = Hand(agent=args.agent, session=args.session, project=args.project, reason="done", since=time.time())
-        await bar.draw(done_payload(hand, args.message, cfg))
+        _, hands = hands_file.take(args.agent, args.session)
+        if hands:
+            await bar.draw(hands_payload(hands, cfg))  # others are still waiting; they matter more
+        else:
+            hand = Hand(agent=args.agent, session=args.session, project=args.project, reason="done", since=time.time())
+            await bar.draw(done_payload(hand, args.message, cfg))
     elif args.command == "hello":
         if cfg.hello_seconds > 0:
             await bar.draw(hello_payload(args.agent, args.project, cfg))

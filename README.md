@@ -15,24 +15,17 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
 </p>
 
-Claude Code asks for permission or waits for you, and the bar shows its
-mascot with an arm up and blinking LEDs. Reply and the arm comes down. Finish
-and it smiles. Turn the wheel to approve a tool call without the keyboard.
-
-## What you see
+A small USB desk gadget that does something cute when your agents need you.
+Claude Code waits for permission or for your answer: the bar shows its mascot
+with an arm up and blinks its LEDs. You reply, the arm comes down. The turn
+ends, it smiles. Turn the wheel to approve a tool call without the keyboard.
 
 | | |
 | --- | --- |
-| <img src="img/hello.png" width="360"> | **Session starts.** Shown for `BUSYBAR_HELLO_SECONDS`. |
-| <img src="img/hand-up.png" width="360"> | **Needs you.** A permission prompt, with the session name. |
-| <img src="img/your-turn.png" width="360"> | **Your turn.** Claude finished and you have been away a minute. |
-| <img src="img/done.png" width="360"> | **Done.** Shown for `BUSYBAR_DONE_SECONDS`. |
-| <img src="img/ask.png" width="360"> | **Ask.** Wheel forward allows, back denies. Opt-in. |
+| <img src="img/done.png" width="360"> | **Done.** The turn ended. |
+| <img src="img/ask.png" width="360"> | **Ask.** Wheel forward allows, back denies. |
 | <img src="img/two-agents.png" width="360"> | **Two sessions.** One strip, one queue. |
 | <img src="img/back.png" width="360"> | **Your side.** The back OLED mirrors the front. |
-
-Claude is drawn in Claude orange with a 16-pixel mascot. Other agents get a
-`>_` glyph in their own colour.
 
 ## Setup
 
@@ -44,33 +37,14 @@ ln -s "$PWD/busybar-agents/adapters/claude-code" ~/.claude/skills/busybar-agents
 claude
 ```
 
-The plugin runs the CLI from the clone through [uv](https://docs.astral.sh/uv/).
-Optional: `uv tool install git+https://github.com/davidkh1/busybar-agents`
-puts `busybar-agents` on your PATH. For one session only:
-`claude --plugin-dir ./busybar-agents/adapters/claude-code`.
+Needs [uv](https://docs.astral.sh/uv/). Linux and macOS.
 
-In auto mode Claude approves tools itself, so the permission hand is rare;
-everything else works, and a call the classifier blocks raises a hand too.
+The hand goes up when Claude needs permission, waits for you, needs input,
+or auto mode blocks a call. It comes down when you type. Every turn ends
+with DONE. The name after the reason is the session's `/rename` title, or
+the folder.
 
-## Claude Code events
-
-| Event | Bar |
-| --- | --- |
-| `SessionStart` | `CLAUDE / ready` |
-| `Notification` permission prompt | `CLAUDE / permission? - session`, arm up |
-| `Notification` idle, subagent input, elicitation | `CLAUDE / your turn - session` or `input? - session`, arm up |
-| `PermissionDenied`, auto mode | `CLAUDE / blocked - session`, arm up |
-| `UserPromptSubmit`, `SessionEnd` | arm down |
-| `Stop` | `DONE / session` |
-| `PermissionRequest`, `BUSYBAR_ASK=1` | `ALLOW? / Bash: npm test`, the wheel decides |
-| `PreToolUse` for `AskUserQuestion`, `BUSYBAR_ASK=1` | one option at a time, the wheel picks |
-| `Stop` after a question, `BUSYBAR_GO=1` | `GO? / wheel = yes`, wheel forward continues |
-
-The session name is the one you gave with `/rename`, else the folder.
-
-## Talk back with the wheel
-
-Off by default:
+## The wheel
 
 ```bash
 BUSYBAR_ASK=1 BUSYBAR_GO=1 claude
@@ -78,16 +52,12 @@ BUSYBAR_ASK=1 BUSYBAR_GO=1 claude
 
 | Claude asks | Bar shows | Wheel |
 | --- | --- | --- |
-| permission for a tool call | `ALLOW? / Bash: npm test` | forward allows, back or Back denies |
-| a multiple-choice question | `React / 1/3 Framework` | scroll, rest on an option to pick it |
+| permission for a tool call | `ALLOW? / Bash: npm test` | forward allows, back denies |
+| a multiple-choice question | `React / 1/3 Framework` | scroll, rest to pick |
 | "shall I…?" at the end of a turn | `GO? / wheel = yes` | forward means go ahead |
 
-Do nothing for `BUSYBAR_ASK_TIMEOUT` seconds and the terminal prompt appears
-as usual. Multi-select questions stay in the terminal. Only the wheel and
-Back are used: Start and OK drive the bar's own UI.
-
-Works in the BUSY and CUSTOM positions while nothing runs. A running focus
-session outranks the plugin; `BUSYBAR_PRIORITY=91` overrides.
+Leave it alone and the terminal prompt appears as usual. A running focus
+session outranks the plugin unless `BUSYBAR_PRIORITY=91`.
 
 ## Codex CLI
 
@@ -96,17 +66,37 @@ python3 busybar-agents/adapters/codex/install.py   # merges into ~/.codex/hooks.
 codex                                               # then /hooks, trust them
 ```
 
-| Event | Bar |
-| --- | --- |
-| `SessionStart` | `CODEX / ready` |
-| `PermissionRequest` | `CODEX / permission? - folder`; `BUSYBAR_ASK=1`: the wheel decides |
-| `UserPromptSubmit`, `PostToolUse`, `Interrupt`, `SessionEnd` | arm down |
-| `Stop` | `DONE / folder`; `BUSYBAR_GO=1` after a question: wheel forward continues |
+Same hands, same wheel. `install.py --uninstall` removes them.
 
-Codex runs only trusted hooks and asks again when one changes.
-`install.py --uninstall` removes ours and keeps the rest.
+## Settings
 
-## Command line
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `BUSYBAR_ADDR` | `10.0.4.20` | The bar's fixed USB address, or its Wi-Fi address |
+| `BUSYBAR_TOKEN` | unset | Access key, Wi-Fi only |
+| `BUSYBAR_PRIORITY` | `50` | `91` or more overrides a running focus session |
+| `BUSYBAR_SOUND` | off | `1` for a chime on hand up |
+| `BUSYBAR_ASK` | off | `1`: permissions and questions on the wheel |
+| `BUSYBAR_GO` | off | `1`: go ahead on the wheel after a question |
+
+<details>
+<summary>More settings</summary>
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `BUSYBAR_TTL` | `1800` | Seconds a hand may stay up |
+| `BUSYBAR_DONE_SECONDS` | `8` | How long DONE stays |
+| `BUSYBAR_HELLO_SECONDS` | `4` | Ready blip at session start, `0` disables |
+| `BUSYBAR_ASK_TIMEOUT` | `20` | Seconds to wait for the wheel |
+| `BUSYBAR_GO_SECONDS` | `8` | How long GO? stays |
+| `BUSYBAR_DRY_RUN` | off | `1` prints payloads instead of drawing |
+| `BUSYBAR_STATE` | platform default | Hands file: `~/.local/state/busybar-agents/hands.json` on Linux, `~/Library/Application Support/busybar-agents/hands.json` on macOS |
+| `BUSYBAR_AGENTS_BIN` | unset | CLI command for the hook bridges |
+
+</details>
+
+<details>
+<summary>Command line and internals</summary>
 
 ```bash
 busybar-agents raise  --agent claude --session 1a2b3c4d --project api --reason "permission?"
@@ -114,63 +104,22 @@ busybar-agents lower  --agent claude --session 1a2b3c4d
 busybar-agents done   --agent claude --session 1a2b3c4d --project api
 busybar-agents ask    --question "ALLOW?" --detail "Bash: npm test"   # allow, deny or timeout
 busybar-agents choose --title Framework --option React --option Vue    # the label, cancel or timeout
-busybar-agents hello  --agent claude --project api
-busybar-agents status
-busybar-agents redraw
-busybar-agents clear
+busybar-agents hello | status | redraw | clear
 ```
 
-One hand per agent and session. Two hands read `2 AGENTS`; lowering one
-redraws the other; DONE shows only when nobody waits. Hands expire after
-`BUSYBAR_TTL`. The wheel answers whichever session asked first.
-
-## Configuration
-
-All settings are environment variables.
-
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `BUSYBAR_ADDR` | `10.0.4.20` | The bar's fixed USB address, or its Wi-Fi address |
-| `BUSYBAR_TOKEN` | unset | Access key, Wi-Fi only |
-| `BUSYBAR_PRIORITY` | `50` | `91` or more overrides a running focus session |
-| `BUSYBAR_SOUND` | off | `1` for the stock `reminder` chime on hand up, or a stock sound name |
-| `BUSYBAR_TTL` | `1800` | Seconds a hand may stay up |
-| `BUSYBAR_DONE_SECONDS` | `8` | How long DONE stays |
-| `BUSYBAR_HELLO_SECONDS` | `4` | Ready blip length, `0` disables |
-| `BUSYBAR_ASK_TIMEOUT` | `20` | Seconds to wait for the wheel |
-| `BUSYBAR_ASK` | off | `1`: permissions and questions on the wheel |
-| `BUSYBAR_GO` | off | `1`: go ahead on the wheel after a question |
-| `BUSYBAR_GO_SECONDS` | `8` | How long GO? stays |
-| `BUSYBAR_DRY_RUN` | off | `1` prints payloads instead of drawing |
-| `BUSYBAR_STATE` | platform default | Hands file: `~/.local/state/busybar-agents/hands.json` on Linux, `~/Library/Application Support/busybar-agents/hands.json` on macOS |
-| `BUSYBAR_AGENTS_BIN` | unset | CLI command for the hook bridges |
-
-## How it works
-
-```
-Claude Code hook ──▶ adapters/claude-code/hook.py ──▶ busybar-agents ──▶ busylib ──▶ HTTP API ──▶ bar
-Codex hook ────────▶ adapters/codex/hook.py ───────────────┘
-```
-
-Hands are recorded in one JSON file and the strip is redrawn from the whole
-list. Everything is filed under the application name `busybar-agents`, so
-`clear` removes only our own work. Drawings carry a timeout. Icons are inline
-bitmaps and sounds are stock; nothing is uploaded to the bar.
-
-## Linux and macOS
-
-The bar appears as a USB network interface on both, without drivers. The hook
-bridges run on the system `python3` (3.9 is enough); the CLI runs under uv
-with Python 3.10 or newer. CI tests both. Windows is untested.
-
-## Development
+Each adapter is one standard-library script that turns hook events into
+these verbs. Hands are recorded in one JSON file, one per agent and
+session, and the strip is redrawn from the whole list, so several sessions
+share it. Everything is filed under the application name `busybar-agents`
+and carries a timeout; icons are inline bitmaps, sounds are stock, nothing
+is uploaded to the bar.
 
 ```bash
-uv sync
-uv run pytest                      # no hardware needed
-uv run busybar-agents status       # with a bar plugged in
+uv sync && uv run pytest          # no hardware needed
 claude plugin validate ./adapters/claude-code
 ```
+
+</details>
 
 ## Credits
 
@@ -178,7 +127,5 @@ Built on [busylib](https://github.com/busy-app/busylib-py), Flipper Devices'
 MIT-licensed Python client, and the bar's
 [HTTP API](https://docs.busy.app/bar/dev/http-api). The mascot belongs to
 Claude Code. Not affiliated with Flipper Devices or Anthropic.
-
-## License
 
 MIT. Images in `img/` are CC BY 4.0.

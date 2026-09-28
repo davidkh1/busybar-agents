@@ -24,7 +24,7 @@ optional.
 | --- | --- |
 | <img src="img/done.png" width="360"> | **Done.** The turn ended. |
 | <img src="img/ask.png" width="360"> | **Ask.** Wheel forward allows, back denies. |
-| <img src="img/two-agents.png" width="360"> | **Two sessions.** One strip, one queue. |
+| <img src="img/two-agents.png" width="360"> | **Two sessions.** Both on one strip. |
 | <img src="img/back.png" width="360"> | **Your side.** The back OLED mirrors the front. |
 
 ## Setup
@@ -36,9 +36,9 @@ Plug the bar in over USB, then inside Claude Code:
 /plugin install busybar-agents@busybar-agents
 ```
 
-Needs [uv](https://docs.astral.sh/uv/) on your PATH; the plugin runs its
-command line through `uvx`, fetched once. Linux and macOS. That is all;
-everything below is optional.
+Needs Python 3.10+ and [uv](https://docs.astral.sh/uv/) on your PATH; the
+plugin fetches its own `busybar-agents` command once with `uvx`. Linux and
+macOS. That is all; everything below is optional.
 
 <details>
 <summary>From a clone instead</summary>
@@ -48,16 +48,15 @@ git clone https://github.com/davidkh1/busybar-agents
 ln -s "$PWD/busybar-agents/adapters/claude-code" ~/.claude/skills/busybar-agents
 ```
 
-The hook then finds the command line in the clone, so edits take effect at
-once. Loading a plugin from the skills folder is undocumented; it works
+The hook then runs `busybar-agents` from the clone, so edits take effect
+at once. Loading a plugin from the skills folder is undocumented; it works
 today. Do not combine it with the plugin install or every hook runs twice.
 
 </details>
 
-The hand goes up when Claude needs permission, waits for you, needs input,
-or auto mode blocks a call. It comes down when you type. Every turn ends
-with DONE. The name after the reason is the session's `/rename` title, or
-the folder, and `/color pink` turns that session's mascot and LEDs pink.
+A blocked call in auto mode raises the hand too. The strip's bottom line
+shows the reason, then the session's `/rename` title or the folder name;
+`/color pink` turns that session's mascot and LEDs pink.
 
 ## The wheel
 
@@ -77,20 +76,23 @@ variable in the environment wins over it.
 | --- | --- | --- |
 | permission for a tool call (`ASK`) | `ALLOW?`, `Bash: npm test` | wheel forward allows, back denies |
 | a multiple-choice question (`ASK`) | `React`, `1/3 Framework` | scroll to an option, stay on it for 2.5 s |
-| "shall I…?" at the end of a turn (`GO`) | `GO?`, `wheel = yes` | forward means go ahead |
+| a turn that ends in a question (`GO`) | `GO?`, `wheel = yes` | forward means go ahead |
 
 Ignore the bar and the terminal asks you instead, after 20 seconds
 (`BUSYBAR_ASK_TIMEOUT`).
 
 ## Codex CLI
 
+Clone the repo, then:
+
 ```bash
 python3 busybar-agents/adapters/codex/install.py   # merges into ~/.codex/hooks.json
 codex                                               # then /hooks, trust them
 ```
 
-Same hands, same wheel, same `busybar-agents wheel on` switch. `install.py
---uninstall` removes them.
+Same hands, same wheel. The switch is
+`uv run --project busybar-agents busybar-agents wheel on`.
+`install.py --uninstall` removes the hooks.
 
 ## Settings
 
@@ -98,7 +100,7 @@ Same hands, same wheel, same `busybar-agents wheel on` switch. `install.py
 | --- | --- | --- |
 | `BUSYBAR_ADDR` | `10.0.4.20` | The bar's fixed USB address, or its Wi-Fi address |
 | `BUSYBAR_TOKEN` | unset | Access key, Wi-Fi only |
-| `BUSYBAR_PRIORITY` | `50` | `91` or more draws over a running focus session, which otherwise outranks the plugin |
+| `BUSYBAR_PRIORITY` | `50` | `91` or more draws over a running BUSY session, which otherwise outranks the plugin |
 | `BUSYBAR_SOUND` | off | `1` plays the bar's reminder chime when a hand goes up; or a stock sound name (`event`, `reminder`) |
 | `BUSYBAR_ASK` | off | `1`: permissions and questions on the wheel |
 | `BUSYBAR_GO` | off | `1`: go ahead on the wheel after a question |
@@ -114,7 +116,7 @@ Same hands, same wheel, same `busybar-agents wheel on` switch. `install.py
 | `BUSYBAR_ASK_TIMEOUT` | `20` | Seconds to wait for the wheel |
 | `BUSYBAR_GO_SECONDS` | `8` | How long GO? stays |
 | `BUSYBAR_DRY_RUN` | off | `1` prints payloads instead of drawing |
-| `BUSYBAR_STATE` | platform default | Hands file: `~/.local/state/busybar-agents/hands.json` on Linux, `~/Library/Application Support/busybar-agents/hands.json` on macOS |
+| `BUSYBAR_STATE` | platform default | Hands file, with the wheel switch beside it: `~/.local/state/busybar-agents/hands.json` on Linux, `~/Library/Application Support/busybar-agents/hands.json` on macOS |
 | `BUSYBAR_AGENTS_BIN` | unset | CLI command for the hook bridges |
 
 </details>

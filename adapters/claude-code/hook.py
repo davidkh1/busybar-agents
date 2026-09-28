@@ -61,7 +61,7 @@ def ends_with_question(text: str) -> bool:
 
 
 # Pinned to a commit: uvx resolves a full SHA from its cache, a branch or tag costs a fetch every run.
-PACKAGE_URL = "git+https://github.com/davidkh1/busybar-agents@5df9a19ed01758e903e361ff9697d1bf1da46f7f"
+PACKAGE_URL = "git+https://github.com/davidkh1/busybar-agents@58115506f2cea40547a4cce7c805e8819ac3df16"
 
 
 def cli_command() -> list[str] | None:

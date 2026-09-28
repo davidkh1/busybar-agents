@@ -46,8 +46,8 @@ the folder, and `/color pink` turns that session's mascot and LEDs pink.
 
 ## The wheel
 
-Want to answer from the bar instead of the keyboard? Start Claude with the
-two switches on:
+The bar has a wheel on its side. Two switches let you answer Claude with it
+instead of the keyboard:
 
 ```bash
 BUSYBAR_ASK=1 BUSYBAR_GO=1 claude
@@ -55,14 +55,14 @@ BUSYBAR_ASK=1 BUSYBAR_GO=1 claude
 
 Export them in your shell profile and the command stays plain `claude`.
 
-| Claude asks | Bar shows | Wheel |
+| Claude asks | Top line, bottom line | You |
 | --- | --- | --- |
-| permission for a tool call | `ALLOW? / Bash: npm test` | forward allows, back denies |
-| a multiple-choice question | `React / 1/3 Framework` | scroll, rest to pick |
-| "shall I…?" at the end of a turn | `GO? / wheel = yes` | forward means go ahead |
+| permission for a tool call (`ASK`) | `ALLOW?`, `Bash: npm test` | wheel forward allows, back denies |
+| a multiple-choice question (`ASK`) | `React`, `1/3 Framework` | scroll to an option, stay on it for 2.5 s |
+| "shall I…?" at the end of a turn (`GO`) | `GO?`, `wheel = yes` | forward means go ahead |
 
-Leave it alone and the terminal prompt appears as usual. A running focus
-session outranks the plugin unless `BUSYBAR_PRIORITY=91`.
+Ignore the bar and the terminal asks you instead, after 20 seconds
+(`BUSYBAR_ASK_TIMEOUT`).
 
 ## Codex CLI
 
@@ -79,7 +79,7 @@ Same hands, same wheel. `install.py --uninstall` removes them.
 | --- | --- | --- |
 | `BUSYBAR_ADDR` | `10.0.4.20` | The bar's fixed USB address, or its Wi-Fi address |
 | `BUSYBAR_TOKEN` | unset | Access key, Wi-Fi only |
-| `BUSYBAR_PRIORITY` | `50` | `91` or more overrides a running focus session |
+| `BUSYBAR_PRIORITY` | `50` | `91` or more draws over a running focus session, which otherwise outranks the plugin |
 | `BUSYBAR_SOUND` | off | `1` plays the bar's reminder chime when a hand goes up; or a stock sound name (`event`, `reminder`) |
 | `BUSYBAR_ASK` | off | `1`: permissions and questions on the wheel |
 | `BUSYBAR_GO` | off | `1`: go ahead on the wheel after a question |

@@ -31,8 +31,7 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hook.py\"",
-            "async": true,
-            "timeout": 20
+            "timeout": 15
           }
         ]
       }
@@ -43,8 +42,7 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hook.py\"",
-            "async": true,
-            "timeout": 20
+            "timeout": 15
           }
         ]
       }

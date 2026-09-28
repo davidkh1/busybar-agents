@@ -5,6 +5,11 @@ Claude Code sends the event as JSON on stdin. This script turns it into one
 call of the ``busybar-agents`` CLI, which does the drawing. It never fails
 loudly: a missing bar or a missing CLI must not slow Claude down.
 
+Notification and UserPromptSubmit run as background hooks, so they never
+delay Claude. Stop and SessionEnd run in the foreground on purpose: Claude
+Code exits right after them in print mode and would otherwise leave a
+background hook unstarted, and each call takes about a quarter of a second.
+
 Events handled:
   Notification       permission_prompt, idle_prompt, agent_needs_input,
                      elicitation_*        -> raise a hand

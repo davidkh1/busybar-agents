@@ -78,6 +78,11 @@ object from `adapters/claude-code/hooks/hooks.json` into `~/.claude/settings.jso
 | `Stop` | done |
 | `PermissionRequest`, only with `BUSYBAR_ASK=1` | ask, then answer Claude Code |
 
+The hand-up and hand-down hooks run in the background. `Stop` and
+`SessionEnd` run in the foreground because Claude Code exits right after them
+in print mode and would skip a background hook; each takes about a quarter of
+a second.
+
 ### Answering from the bar
 
 ```bash

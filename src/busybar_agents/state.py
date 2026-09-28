@@ -90,13 +90,24 @@ class HandsFile:
             self._write(hands)
             return hands
 
-    def lower(self, agent: str, session: str) -> list[Hand]:
-        """Remove one hand. Returns what is still up."""
+    def take(self, agent: str, session: str) -> tuple[bool, list[Hand]]:
+        """Remove one hand. Returns whether it was up at all, and what is still up.
+
+        The distinction matters: lowering a hand that was already lowered must
+        not touch the strip, or a DONE drawn a moment earlier gets wiped.
+        """
         key = f"{agent}:{session}"
         with self._locked():
-            hands = [h for h in self._read() if h.key != key]
-            self._write(hands)
-            return hands
+            hands = self._read()
+            remaining = [h for h in hands if h.key != key]
+            removed = len(remaining) != len(hands)
+            if removed:
+                self._write(remaining)
+            return removed, remaining
+
+    def lower(self, agent: str, session: str) -> list[Hand]:
+        """Remove one hand. Returns what is still up."""
+        return self.take(agent, session)[1]
 
     def prune(self, ttl: int) -> list[Hand]:
         """Drop hands older than ttl seconds: their session probably died."""

@@ -4,6 +4,7 @@
     busybar-agents lower --agent claude --session 1a2b3c4d
     busybar-agents done  --agent claude --session 1a2b3c4d --project api
     busybar-agents ask   --question "ALLOW?" --detail "Bash: npm test"   # prints allow|deny|timeout
+    busybar-agents hello --agent claude --project api                     # 4 s blip: ready
     busybar-agents status
     busybar-agents clear
 
@@ -21,7 +22,7 @@ import time
 from pathlib import Path
 
 from . import __version__
-from .bar import Bar, done_payload, hands_payload, print_error
+from .bar import Bar, done_payload, hands_payload, hello_payload, print_error
 from .config import Config
 from .state import Hand, HandsFile
 
@@ -48,6 +49,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("done", help="lower the hand and show a short green DONE")
     _add_identity(p)
     p.add_argument("--message", default="DONE")
+
+    p = sub.add_parser("hello", help="short blip that the bar is listening; no state change")
+    _add_identity(p)
 
     p = sub.add_parser("ask", help="show a question, wait for the wheel, print allow|deny|timeout")
     _add_identity(p)
@@ -81,9 +85,12 @@ async def perform(args: argparse.Namespace, cfg: Config, hands_file: HandsFile, 
         hands_file.take(args.agent, args.session)
         hand = Hand(agent=args.agent, session=args.session, project=args.project, reason="done", since=time.time())
         await bar.draw(done_payload(hand, args.message, cfg))
+    elif args.command == "hello":
+        if cfg.hello_seconds > 0:
+            await bar.draw(hello_payload(args.agent, args.project, cfg))
     elif args.command == "ask":
         timeout = args.timeout or cfg.ask_timeout
-        answer = await bar.ask(args.question, args.detail, timeout)
+        answer = await bar.ask(args.agent, args.question, args.detail, timeout)
         hands = hands_file.prune(cfg.ttl)
         if hands:
             await bar.draw(hands_payload(hands, cfg))

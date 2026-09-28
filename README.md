@@ -18,13 +18,18 @@ and an open HTTP API over USB. This project is the small piece in between.
 
 ## What happens on the bar
 
-| Moment | Strip | LEDs |
-| --- | --- | --- |
-| Claude asks for permission, waits idle, or a subagent needs input | eyes, `CLAUDE`, `needs permission - project` | amber blink |
-| You type a reply, or the session ends | cleared | off |
-| A turn finishes | check, `DONE`, `claude: project` for a few seconds | green blink |
-| A tool call needs a decision (opt-in) | dialog, `ALLOW?`, `Bash: npm test` | blue blink |
-| Two or more agents are waiting | `2 AGENTS`, `api, web` | amber blink |
+| Moment | Strip |
+| --- | --- |
+| A session starts | Clawd, `CLAUDE`, `ready`, four seconds |
+| Claude asks for permission, waits idle, or a subagent needs input | Clawd with an arm up, `CLAUDE`, `permission?` / `your turn` / `input?` |
+| You type a reply, or the session ends | cleared |
+| A turn finishes | happy Clawd, `DONE`, `project`, eight seconds |
+| A tool call needs a decision (opt-in) | Clawd with an arm up, `ALLOW?`, `Bash: npm test` |
+| Two or more agents are waiting | `2 AGENTS`, `api, web` |
+
+Claude's screens use Claude's orange and Clawd, the Claude Code mascot, as a
+16-pixel bitmap drawn inline. The status LEDs blink in the same colour. Other
+agents get a `>_` glyph in their own colour.
 
 ![Two agents waiting](docs/two-agents.png)
 ![A finished turn](docs/done.png)
@@ -73,6 +78,7 @@ object from `adapters/claude-code/hooks/hooks.json` into `~/.claude/settings.jso
 
 | Claude Code event | What the bar does |
 | --- | --- |
+| `SessionStart` on startup or resume | ready blip |
 | `Notification` with `permission_prompt`, `idle_prompt`, `agent_needs_input`, `elicitation_dialog` | hand up |
 | `UserPromptSubmit`, `SessionEnd` | hand down |
 | `Stop` | done |
@@ -110,6 +116,7 @@ busybar-agents raise --agent claude --session 1a2b3c4d --project api --reason "n
 busybar-agents lower --agent claude --session 1a2b3c4d
 busybar-agents done  --agent claude --session 1a2b3c4d --project api
 busybar-agents ask   --question "ALLOW?" --detail "Bash: npm test"    # prints allow, deny or timeout
+busybar-agents hello --agent claude --project api                  # four-second ready blip
 busybar-agents status
 busybar-agents clear
 ```
@@ -130,7 +137,8 @@ shell, a Claude Code hook, or any other adapter.
 | `BUSYBAR_PRIORITY` | `50` | Draw priority. `91` or more shows even over a running BUSY session. |
 | `BUSYBAR_SOUND` | off | `1` for the stock `reminder` chime on hand up, or any stock sound name. |
 | `BUSYBAR_TTL` | `1800` | Seconds a hand stays up if nobody lowers it. |
-| `BUSYBAR_DONE_SECONDS` | `8` | How long the green DONE stays. |
+| `BUSYBAR_DONE_SECONDS` | `8` | How long DONE stays. |
+| `BUSYBAR_HELLO_SECONDS` | `4` | Length of the ready blip at session start. `0` turns it off. |
 | `BUSYBAR_ASK_TIMEOUT` | `20` | Seconds to wait for the wheel before falling back to the terminal. |
 | `BUSYBAR_ASK` | off | `1` lets the Claude Code adapter answer permission prompts from the bar. |
 | `BUSYBAR_DRY_RUN` | off | `1` prints the payloads instead of drawing. |
@@ -152,14 +160,14 @@ Everything it draws or plays is filed under the application name
 work and leaves the bar's timers and other apps alone. Drawings carry a
 timeout, so an unplugged laptop never leaves a hand up forever.
 
-Only stock artwork and sounds are used; nothing is uploaded to the bar.
+Icons are inline bitmaps and sounds are stock; nothing is uploaded to the bar.
 
 ## Roadmap
 
 - Codex CLI adapter, through its hooks.
 - Gemini CLI adapter, through its `Notification` and `AfterAgent` hooks.
 - An MCP server exposing `raise_hand` and `ask_user`, for agents without hooks.
-- A wave instead of a static hand, using the bar's stock `wave_invitation` animation.
+- A waving Clawd, using the bar's animation element.
 
 ## Development
 

@@ -11,6 +11,7 @@ Code exits right after them in print mode and would otherwise leave a
 background hook unstarted, and each call takes about a quarter of a second.
 
 Events handled:
+  SessionStart       startup or resume    -> short "ready" blip
   Notification       permission_prompt, idle_prompt, agent_needs_input,
                      elicitation_*        -> raise a hand
   UserPromptSubmit   you typed something  -> lower the hand
@@ -32,11 +33,11 @@ from pathlib import Path
 AGENT = "claude"
 
 REASONS = {
-    "permission_prompt": "needs permission",
-    "idle_prompt": "waiting for you",
-    "agent_needs_input": "subagent needs input",
-    "elicitation_dialog": "needs input",
-    "elicitation_url_dialog": "needs input",
+    "permission_prompt": "permission?",
+    "idle_prompt": "your turn",
+    "agent_needs_input": "input?",
+    "elicitation_dialog": "input?",
+    "elicitation_url_dialog": "input?",
 }
 
 
@@ -72,7 +73,7 @@ def tool_summary(tool_name: str, tool_input: dict) -> str:
     for key in ("command", "file_path", "path", "url", "pattern", "query"):
         value = tool_input.get(key)
         if isinstance(value, str) and value.strip():
-            return f"{tool_name}: {value.strip()}"[:60]
+            return f"{tool_name}: {value.strip()}"[:40]
     return tool_name or "tool"
 
 
@@ -98,7 +99,10 @@ def main() -> int:
         )
         return 0
 
-    if name == "Notification":
+    if name == "SessionStart":
+        if event.get("source", "startup") in ("startup", "resume"):
+            run(cmd + ["hello", *common], timeout=15)
+    elif name == "Notification":
         reason = REASONS.get(event.get("notification_type", ""))
         if reason:
             run(cmd + ["raise", *common, "--reason", reason], timeout=15)

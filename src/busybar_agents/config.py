@@ -54,6 +54,7 @@ class Config:
     sound: str | None = None  # BUSYBAR_SOUND: stock sound name, empty/off for silence
     ttl: int = 1800  # BUSYBAR_TTL: seconds a raised hand survives without a lower
     done_seconds: int = 8  # BUSYBAR_DONE_SECONDS: how long the done message stays
+    hello_seconds: int = 4  # BUSYBAR_HELLO_SECONDS: blip when a session starts; 0 disables
     ask_timeout: int = 20  # BUSYBAR_ASK_TIMEOUT: seconds to wait for a button
     dry_run: bool = False  # BUSYBAR_DRY_RUN: print payloads instead of drawing
     state_path: Path = default_state_path()  # BUSYBAR_STATE: shared hands file
@@ -75,6 +76,7 @@ class Config:
             sound=sound,
             ttl=max(1, _int("BUSYBAR_TTL", cls.ttl)),
             done_seconds=max(1, _int("BUSYBAR_DONE_SECONDS", cls.done_seconds)),
+            hello_seconds=max(0, _int("BUSYBAR_HELLO_SECONDS", cls.hello_seconds)),
             ask_timeout=max(1, _int("BUSYBAR_ASK_TIMEOUT", cls.ask_timeout)),
             dry_run=_flag("BUSYBAR_DRY_RUN"),
             state_path=Path(state) if state else default_state_path(),

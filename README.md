@@ -15,11 +15,9 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
 </p>
 
-A small USB desk gadget that does something cute when your agents need you.
-Claude Code waits for permission or for your answer: the bar shows its mascot
-with an arm up, blinks its LEDs, and plays a chime if you turn sound on. You
-reply, the arm comes down. The turn ends, it smiles. Turn the wheel to
-approve a tool call without the keyboard.
+Claude Code needs you: the mascot raises an arm and the LEDs blink. You
+reply, the arm drops. The turn ends, it smiles. Turn the wheel to approve
+a tool call. A chime is optional.
 
 | | |
 | --- | --- |

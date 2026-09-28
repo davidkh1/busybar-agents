@@ -15,9 +15,10 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
 </p>
 
-Claude Code needs you: the mascot raises an arm and the LEDs blink. You
-reply, the arm drops. The turn ends, it smiles. Turn the wheel to approve
-a tool call. A chime is optional.
+When Claude Code waits for permission or input, the mascot on the bar
+raises an arm and the LEDs blink. The arm drops once you reply, and DONE
+marks the end of each turn. The wheel can approve a tool call. A chime is
+optional.
 
 | | |
 | --- | --- |

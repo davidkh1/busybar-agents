@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="img/hand-up.png" width="576" alt="The bar's front strip: Clawd with an arm up, CLAUDE, permission?">
+  <img src="img/your-turn.png" width="576" alt="The bar's front strip: Clawd with an arm up, CLAUDE, your turn">
 </p>
 
 <h1 align="center">busybar-agents</h1>
@@ -112,6 +112,26 @@ nothing is running. A running focus session outranks the plugin, so hands
 wait quietly until it ends. Set `BUSYBAR_PRIORITY=91` to let agents through
 even then.
 
+## Codex CLI
+
+The same bar and the same wheel, through Codex's lifecycle hooks.
+
+```bash
+python3 busybar-agents/adapters/codex/install.py   # merges into ~/.codex/hooks.json
+codex                                               # then type /hooks and trust them
+```
+
+| Codex event | Bar |
+| --- | --- |
+| `SessionStart` | `CODEX / ready` |
+| `PermissionRequest` | `CODEX / permission?`; with `BUSYBAR_ASK=1` the wheel decides |
+| `UserPromptSubmit`, `PostToolUse`, `Interrupt`, `SessionEnd` | hand down |
+| `Stop` | `DONE / folder`; with `BUSYBAR_GO=1` after a question, wheel forward continues |
+
+Codex only runs hooks you have trusted, and asks again whenever a hook's
+definition changes. `install.py --uninstall` takes ours out and leaves any
+other hooks in the file alone.
+
 ## The command line
 
 Every adapter calls these. So can any script.
@@ -162,8 +182,8 @@ and `~/Library/Application Support/busybar-agents/hands.json` on macOS.
 
 ```
 Claude Code hook ──▶ adapters/claude-code/hook.py ──▶ busybar-agents ──▶ busylib ──▶ HTTP API ──▶ bar
-Codex, Gemini hooks ─┘ (adapters to come)                │
-MCP server (to come) ────────────────────────────────────┘
+Codex hook ────────▶ adapters/codex/hook.py ───────────────┘
+Gemini CLI hook (to come), MCP server (to come) ───────────┘
 ```
 
 The CLI records hands in a small JSON file and redraws the strip from the
@@ -194,7 +214,6 @@ claude plugin validate ./adapters/claude-code
 
 ## Roadmap
 
-- Codex CLI adapter, through its hooks.
 - Gemini CLI adapter, through its `Notification` and `AfterAgent` hooks.
 - An MCP server exposing `raise_hand` and `ask_user`, for agents without hooks.
 - A waving Clawd, using the bar's animation element.

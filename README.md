@@ -38,7 +38,7 @@ agents get a `>_` glyph in their own colour.
 ## Setup in a minute
 
 ```bash
-# 1. Plug the bar in over USB. It answers at 10.0.4.20, no drivers.
+# 1. Plug the bar in over USB. No drivers, no setup: it has a fixed USB address.
 
 # 2. Clone, and link the Claude Code plugin so it loads in every session.
 git clone https://github.com/davidkh1/busybar-agents
@@ -161,7 +161,7 @@ shell, a Claude Code hook, or any other adapter.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `BUSYBAR_ADDR` | `10.0.4.20` | USB address, or the bar's Wi-Fi address |
+| `BUSYBAR_ADDR` | `10.0.4.20` | The bar's fixed USB address. Set it to the bar's Wi-Fi address instead to work over the network |
 | `BUSYBAR_TOKEN` | unset | Access key, needed over Wi-Fi only |
 | `BUSYBAR_PRIORITY` | `50` | `91` or more shows even over a running BUSY session |
 | `BUSYBAR_SOUND` | off | `1` for the stock `reminder` chime on hand up, or any stock sound |
@@ -197,7 +197,7 @@ inline bitmaps and sounds are stock; nothing is uploaded to the bar.
 ## Linux and macOS
 
 Both work the same way. The bar appears as a USB network interface without
-drivers and answers at `10.0.4.20`. The hook bridge runs on the system
+drivers, at the same fixed USB address. The hook bridge runs on the system
 `python3`, including the 3.9 that Apple's developer tools ship, while the
 CLI runs under uv with its own Python 3.10 or newer. CI runs the tests on
 Ubuntu and macOS. Windows is untested.

@@ -11,6 +11,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+# The bar's address over USB. The firmware fixes it; nothing else should spell it out.
+USB_ADDRESS = "10.0.4.20"
+
 # The application_name every drawing and sound is filed under on the bar.
 # Clearing this name removes everything we drew and nothing anyone else did.
 APP_NAME = "busybar-agents"
@@ -48,7 +51,7 @@ def default_state_path() -> Path:
 class Config:
     """Runtime settings. See README for the matching environment variables."""
 
-    addr: str = "10.0.4.20"  # BUSYBAR_ADDR: USB address, or the bar's Wi-Fi address
+    addr: str = USB_ADDRESS  # BUSYBAR_ADDR: the USB address, or the bar's Wi-Fi address
     token: str | None = None  # BUSYBAR_TOKEN: access key, only needed over Wi-Fi
     priority: int = 50  # BUSYBAR_PRIORITY: 90+ shows over a running BUSY session
     sound: str | None = None  # BUSYBAR_SOUND: stock sound name, empty/off for silence

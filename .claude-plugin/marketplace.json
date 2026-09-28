@@ -10,7 +10,7 @@
     {
       "name": "busybar-agents",
       "description": "Claude Code raises a hand on your BUSY Bar when it needs you. Optional: answer permissions and questions with the bar's wheel.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "David Khosid",
         "url": "https://github.com/davidkh1"

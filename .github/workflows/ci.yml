@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: uv sync
+      - name: Unit tests (no hardware)
+        run: uv run pytest -q
+      - name: Hook bridge compiles on Python 3.9 (what macOS developer tools ship)
+        run: uv run --python 3.9 --no-project python -m py_compile adapters/claude-code/hook.py
+      - name: Hook bridge dry run through the repo fallback
+        env:
+          BUSYBAR_DRY_RUN: "1"
+          BUSYBAR_STATE: ${{ runner.temp }}/hands.json
+        run: |
+          echo '{"hook_event_name":"Notification","notification_type":"permission_prompt","session_id":"ci000000","cwd":"."}' | python3 adapters/claude-code/hook.py
+          test -f "$BUSYBAR_STATE"
+      - name: Plugin files are valid JSON
+        run: python3 -c "import json; [json.load(open(p)) for p in ('adapters/claude-code/.claude-plugin/plugin.json', 'adapters/claude-code/hooks/hooks.json')]"

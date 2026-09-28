@@ -1,0 +1,11 @@
+{
+  "name": "busybar-agents",
+  "displayName": "BUSY Bar hand-raise",
+  "description": "Claude Code raises a hand on your BUSY Bar when it needs you: permission prompts, idle waits and finished turns. Optional: approve or deny a tool call from the bar's wheel.",
+  "version": "0.1.0",
+  "author": { "name": "David Khosid", "url": "https://github.com/davidkh1" },
+  "homepage": "https://github.com/davidkh1/busybar-agents",
+  "repository": "https://github.com/davidkh1/busybar-agents",
+  "license": "MIT",
+  "keywords": ["busy-bar", "flipper", "notifications", "hooks", "hardware"]
+}

@@ -44,17 +44,28 @@ def ends_with_question(text: str) -> bool:
     return bool(lines) and lines[-1].endswith("?")
 
 
+# Pinned to a commit: uvx resolves a full SHA from its cache, a branch or tag costs a fetch every run.
+PACKAGE_URL = "git+https://github.com/davidkh1/busybar-agents@5df9a19ed01758e903e361ff9697d1bf1da46f7f"
+
+
 def cli_command() -> list[str] | None:
-    """BUSYBAR_AGENTS_BIN, then PATH, then the repo this file lives in."""
+    """BUSYBAR_AGENTS_BIN, then PATH, then the repo this file lives in, then uvx from GitHub.
+
+    A plugin installed from the marketplace is a copy of this folder alone, so
+    the repo fallback misses and uvx fetches the package once into its cache.
+    """
     override = os.environ.get("BUSYBAR_AGENTS_BIN")
     if override:
         return override.split()
     found = shutil.which("busybar-agents")
     if found:
         return [found]
+    uv = shutil.which("uv")
     repo = Path(__file__).resolve().parents[2]
-    if (repo / "pyproject.toml").exists() and shutil.which("uv"):
+    if (repo / "pyproject.toml").exists() and uv:
         return ["uv", "run", "--quiet", "--project", str(repo), "busybar-agents"]
+    if uv:
+        return ["uvx", "--quiet", "--from", PACKAGE_URL, "busybar-agents"]
     return None
 
 

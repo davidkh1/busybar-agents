@@ -28,16 +28,30 @@ a tool call. A chime is optional.
 
 ## Setup
 
-Plug the bar in over USB, then:
+Plug the bar in over USB, then inside Claude Code:
+
+```
+/plugin marketplace add davidkh1/busybar-agents
+/plugin install busybar-agents@busybar-agents
+```
+
+Needs [uv](https://docs.astral.sh/uv/) on your PATH; the plugin runs its
+command line through `uvx`, fetched once. Linux and macOS. That is all;
+everything below is optional.
+
+<details>
+<summary>From a clone instead</summary>
 
 ```bash
 git clone https://github.com/davidkh1/busybar-agents
 ln -s "$PWD/busybar-agents/adapters/claude-code" ~/.claude/skills/busybar-agents
-claude
 ```
 
-Needs [uv](https://docs.astral.sh/uv/). Linux and macOS. That is all;
-everything below is optional.
+The hook then finds the command line in the clone, so edits take effect at
+once. Loading a plugin from the skills folder is undocumented; it works
+today. Do not combine it with the plugin install or every hook runs twice.
+
+</details>
 
 The hand goes up when Claude needs permission, waits for you, needs input,
 or auto mode blocks a call. It comes down when you type. Every turn ends
@@ -121,8 +135,12 @@ is uploaded to the bar.
 
 ```bash
 uv sync && uv run pytest          # no hardware needed
-claude plugin validate ./adapters/claude-code
+claude plugin validate .          # the marketplace and the plugin
 ```
+
+The installed plugin is a copy of `adapters/claude-code` alone, so its hook
+runs the command line with `uvx` pinned to the commit named in `hook.py`.
+Bump that pin when the CLI changes.
 
 </details>
 

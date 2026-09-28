@@ -44,7 +44,7 @@ everything below is optional.
 The hand goes up when Claude needs permission, waits for you, needs input,
 or auto mode blocks a call. It comes down when you type. Every turn ends
 with DONE. The name after the reason is the session's `/rename` title, or
-the folder.
+the folder, and `/color pink` turns that session's mascot and LEDs pink.
 
 ## The wheel
 

@@ -21,11 +21,11 @@ class FakeBar:
     async def play(self, sound):
         self.calls.append(("play", sound))
 
-    async def ask(self, agent, question, detail, timeout):
+    async def ask(self, agent, question, detail, timeout, color=None):
         self.calls.append(("ask", agent, question, detail, timeout))
         return "allow"
 
-    async def choose(self, agent, title, options, timeout):
+    async def choose(self, agent, title, options, timeout, color=None):
         self.calls.append(("choose", agent, title, list(options), timeout))
         return options[-1]
 
@@ -99,3 +99,11 @@ def test_redraw_restores_the_board_or_clears(tmp_path):
     run(hands, bar, "raise", "--agent", "claude", "--session", "a", "--project", "busybar", "--reason", "your turn")
     run(hands, bar, "redraw")
     assert bar.calls[-1] == ("draw", ["CLAUDE", "your turn - busybar"])
+
+
+def test_color_is_recorded_with_the_hand(tmp_path):
+    hands_file = HandsFile(tmp_path / "hands.json")
+    run(hands_file, FakeBar(), "raise", "--agent", "claude", "--session", "s1", "--color", "pink")
+    assert hands_file.load()[0].color == "pink"
+    run(hands_file, FakeBar(), "raise", "--agent", "claude", "--session", "s2")
+    assert [h.color for h in hands_file.load()] == ["pink", None]

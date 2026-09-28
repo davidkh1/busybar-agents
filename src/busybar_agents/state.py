@@ -23,6 +23,7 @@ class Hand:
     project: str  # session name or folder, shown on the bar
     reason: str  # permission?, your turn, ...
     since: float  # unix time
+    color: str | None = None  # session colour, a name or #RRGGBB; None means the agent's default
 
     @property
     def key(self) -> str:

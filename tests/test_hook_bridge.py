@@ -33,6 +33,20 @@ def test_broken_sidecar_falls_back_to_the_folder(tmp_path):
     assert hook.session_label(event(tmp_path)) == "my-repo"
 
 
+def test_session_color_is_the_last_one_chosen(tmp_path):
+    ev = event(tmp_path)
+    assert hook.session_color(ev) is None
+    Path(ev["transcript_path"]).write_text(
+        json.dumps({"type": "agent-color", "agentColor": "orange", "sessionId": "abc"}) + "\n"
+        + json.dumps({"type": "user", "message": "agent-color pink is just text"}) + "\n"
+        + "{not json agent-color\n"
+        + json.dumps({"type": "agent-color", "agentColor": "pink", "sessionId": "abc"}) + "\n"
+    )
+    assert hook.session_color(ev) == "pink"
+    assert hook.session_color({"transcript_path": str(tmp_path / "missing.jsonl")}) is None
+    assert hook.session_color({}) is None
+
+
 def test_tool_summary_is_short():
     assert hook.tool_summary("Bash", {"command": "npm test"}) == "Bash: npm test"
     assert len(hook.tool_summary("Bash", {"command": "x" * 200})) <= 40
@@ -95,3 +109,12 @@ def test_auto_mode_denial_raises_a_hand(monkeypatch, capsys, tmp_path):
     ev = event(tmp_path, hook_event_name="PermissionDenied", tool_name="Bash", tool_input={"command": "rm -rf build"}, reason="[Irreversible Local Destruction]")
     out, calls = drive(monkeypatch, capsys, ev, [])
     assert out is None and calls[0][1] == "raise" and "blocked" in calls[0]
+
+
+def test_color_rides_along_on_every_verb(monkeypatch, capsys, tmp_path):
+    ev = event(tmp_path, hook_event_name="Notification", notification_type="idle_prompt")
+    Path(ev["transcript_path"]).write_text(json.dumps({"type": "agent-color", "agentColor": "pink"}) + "\n")
+    _, calls = drive(monkeypatch, capsys, ev, [])
+    assert calls[0][1] == "raise" and calls[0][calls[0].index("--color") + 1] == "pink"
+    _, calls = drive(monkeypatch, capsys, event(tmp_path, hook_event_name="Notification", notification_type="idle_prompt"), [])
+    assert "--color" not in calls[0]

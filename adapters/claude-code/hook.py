@@ -83,6 +83,30 @@ def session_label(event: dict) -> str:
     return Path(event.get("cwd") or os.getcwd()).name or "project"
 
 
+def session_color(event: dict) -> str | None:
+    """The /color choice: the last agent-color record in the transcript, else None."""
+    transcript = event.get("transcript_path")
+    if not transcript:
+        return None
+    color = None
+    try:
+        with open(transcript, encoding="utf-8", errors="replace") as lines:
+            for line in lines:
+                if '"agent-color"' not in line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(record, dict) and record.get("type") == "agent-color":
+                    value = record.get("agentColor")
+                    if isinstance(value, str) and value.strip():
+                        color = value.strip()
+    except OSError:
+        return None
+    return color
+
+
 def tool_summary(tool_name: str, tool_input: dict) -> str:
     """Tool name and its main argument, short enough for the strip."""
     if not isinstance(tool_input, dict):
@@ -105,6 +129,9 @@ def main() -> int:
     name = event.get("hook_event_name", "")
     session = (event.get("session_id") or "")[:8] or "default"
     common = ["--agent", AGENT, "--session", session, "--project", session_label(event)]
+    color = session_color(event)
+    if color:
+        common += ["--color", color]
 
     cmd = cli_command()
     if cmd is None:

@@ -30,6 +30,7 @@ def _add_identity(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--agent", default="agent", help="claude, codex, ...")
     parser.add_argument("--session", default="default", help="short session id")
     parser.add_argument("--project", default=Path.cwd().name, help="session name or folder, shown on the bar")
+    parser.add_argument("--color", default=None, help="session colour: a name like pink, or #RRGGBB; default is the agent's")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -74,7 +75,7 @@ async def perform(args: argparse.Namespace, cfg: Config, hands_file: HandsFile, 
     """Apply one verb. ``bar`` needs draw, clear, play, ask and choose."""
     hands_file.prune(cfg.ttl)
     if args.command == "raise":
-        hand = Hand(agent=args.agent, session=args.session, project=args.project, reason=args.reason, since=time.time())
+        hand = Hand(agent=args.agent, session=args.session, project=args.project, reason=args.reason, since=time.time(), color=args.color)
         await bar.draw(hands_payload(hands_file.raise_hand(hand), cfg))
         if cfg.sound:
             await bar.play(cfg.sound)
@@ -91,17 +92,17 @@ async def perform(args: argparse.Namespace, cfg: Config, hands_file: HandsFile, 
         if hands:
             await bar.draw(hands_payload(hands, cfg))  # others still waiting
         else:
-            hand = Hand(agent=args.agent, session=args.session, project=args.project, reason="done", since=time.time())
+            hand = Hand(agent=args.agent, session=args.session, project=args.project, reason="done", since=time.time(), color=args.color)
             await bar.draw(done_payload(hand, args.message, cfg))
     elif args.command == "hello":
         if cfg.hello_seconds > 0:
-            await bar.draw(hello_payload(args.agent, args.project, cfg))
+            await bar.draw(hello_payload(args.agent, args.project, cfg, args.color))
     elif args.command in ("ask", "choose"):
         timeout = args.timeout or cfg.ask_timeout
         if args.command == "ask":
-            answer = await bar.ask(args.agent, args.question, args.detail, timeout)
+            answer = await bar.ask(args.agent, args.question, args.detail, timeout, args.color)
         else:
-            answer = await bar.choose(args.agent, args.title, args.option, timeout)
+            answer = await bar.choose(args.agent, args.title, args.option, timeout, args.color)
         hands = hands_file.prune(cfg.ttl)
         if hands:
             await bar.draw(hands_payload(hands, cfg))

@@ -1,12 +1,12 @@
 import time
 
-from busybar_agents.bar import CLAUDE_ORANGE, MASCOT, PROMPT_GLYPH, ask_payload, choice_payload, done_payload, hands_payload, hello_payload, texts
+from busybar_agents.bar import CLAUDE_ORANGE, MASCOT, PROMPT_GLYPH, SESSION_COLORS, ask_payload, choice_payload, done_payload, hands_payload, hello_payload, resolve_color, texts
 from busybar_agents.config import APP_NAME, Config
 from busybar_agents.state import Hand
 
 
-def hand(agent="claude", project="api", reason="permission?", since=None):
-    return Hand(agent=agent, session="s1", project=project, reason=reason, since=since or time.time())
+def hand(agent="claude", project="api", reason="permission?", since=None, color=None, session="s1"):
+    return Hand(agent=agent, session=session, project=project, reason=reason, since=since or time.time(), color=color)
 
 
 def test_single_hand_is_the_agent_and_the_reason():
@@ -76,3 +76,30 @@ def test_choice_shows_one_option_with_its_position():
     payload = choice_payload("claude", "Framework", ["React", "Vue", "Svelte"], 1, 30, Config())
     assert texts(payload) == ["Vue", "2/3 Framework"]
     assert all(e["timeout"] == 30 for e in payload["elements"])
+
+
+def test_session_color_paints_the_mascot_the_headline_and_the_leds():
+    payload = hands_payload([hand(color="pink")], Config())
+    pink = SESSION_COLORS["pink"]
+    assert payload["led_notification_color"] == pink
+    assert pink[:7] in payload["elements"][0]["data"] and "#D97757" not in payload["elements"][0]["data"]
+    assert payload["elements"][1]["color"] == pink
+    assert done_payload(hand(color="pink"), "DONE", Config())["led_notification_color"] == pink
+    assert hello_payload("claude", "api", Config(), "pink")["led_notification_color"] == pink
+    assert ask_payload("claude", "ALLOW?", "", 20, Config(), "pink")["led_notification_color"] == pink
+    assert choice_payload("claude", "Framework", ["React"], 0, 20, Config(), "pink")["led_notification_color"] == pink
+
+
+def test_unknown_or_missing_color_falls_back_to_the_agent():
+    assert resolve_color("claude") == CLAUDE_ORANGE
+    assert resolve_color("claude", "mauve") == CLAUDE_ORANGE
+    assert resolve_color("codex", "") == "#FFFFFFFF"
+    assert resolve_color("claude", "#123abc") == "#123ABCFF"
+    assert resolve_color("claude", "#123ABC80") == "#123ABC80"
+
+
+def test_many_hands_share_a_color_only_when_they_agree():
+    same = hands_payload([hand(color="pink"), hand(session="s2", color="pink")], Config())
+    assert same["led_notification_color"] == SESSION_COLORS["pink"]
+    mixed = hands_payload([hand(color="pink"), hand(session="s2", color="blue")], Config())
+    assert mixed["led_notification_color"] == CLAUDE_ORANGE

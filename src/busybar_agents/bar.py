@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import json
+import re
 import sys
 from typing import Any, Sequence
 
@@ -24,6 +25,19 @@ CLAUDE_ORANGE = "#D97757FF"
 IVORY = "#F0EEE6FF"
 AGENT_COLORS = {"claude": CLAUDE_ORANGE, "codex": "#FFFFFFFF", "gemini": "#4C8DF6FF"}
 DEFAULT_COLOR = "#FFB000FF"
+# Claude Code's /color names, as the bar's LEDs show them.
+SESSION_COLORS = {
+    "red": "#FF3B30FF",
+    "orange": CLAUDE_ORANGE,
+    "yellow": "#FFCC00FF",
+    "green": "#34C759FF",
+    "cyan": "#32ADE6FF",
+    "blue": "#4C8DF6FF",
+    "purple": "#AF52DEFF",
+    "pink": "#FF2D9BFF",
+    "magenta": "#FF00FFFF",
+    "white": "#FFFFFFFF",
+}
 
 # Front strip: 72x16, a 16 px icon at the left, text after it.
 FRONT_WIDTH = 72
@@ -92,6 +106,19 @@ PROMPT_GLYPH = [
 ]
 
 
+def resolve_color(agent: str, color: str | None = None) -> str:
+    """The session's colour when it is a known name or hex, else the agent's default, as #RRGGBBAA."""
+    if color:
+        name = color.strip().lower()
+        if name in SESSION_COLORS:
+            return SESSION_COLORS[name]
+        if re.fullmatch(r"#[0-9a-f]{6}", name):
+            return name.upper() + "FF"
+        if re.fullmatch(r"#[0-9a-f]{8}", name):
+            return name.upper()
+    return AGENT_COLORS.get(agent.lower(), DEFAULT_COLOR)
+
+
 def xpm(rows: Sequence[str], colors: dict[str, str]) -> str:
     """Rows of characters plus a colour per character, as XPM2."""
     width = len(rows[0])
@@ -102,9 +129,9 @@ def xpm(rows: Sequence[str], colors: dict[str, str]) -> str:
     return "\n".join([*header, *rows])
 
 
-def icon_element(agent: str, timeout: int, mood: str = "ready") -> dict[str, Any]:
+def icon_element(agent: str, timeout: int, mood: str = "ready", color: str | None = None) -> dict[str, Any]:
     """Inline bitmap; one element type for id 10, which the firmware requires."""
-    color = AGENT_COLORS.get(agent.lower(), DEFAULT_COLOR)[:7]
+    color = resolve_color(agent, color)[:7]
     if agent.lower() == "claude":
         data = xpm(MASCOT[mood], {".": "none", "o": color, "w": "#FFFFFF"})
     else:
@@ -130,11 +157,11 @@ def text_element(element_id: str, text: str, font: str, color: str, y: int, alig
     return element
 
 
-def notice(agent: str, line_1: str, line_2: str, timeout: int, cfg: Config, mood: str = "ready") -> dict[str, Any]:
-    """Icon, bold headline in the agent's colour, small detail line."""
-    color = AGENT_COLORS.get(agent.lower(), DEFAULT_COLOR)
+def notice(agent: str, line_1: str, line_2: str, timeout: int, cfg: Config, mood: str = "ready", color: str | None = None) -> dict[str, Any]:
+    """Icon, bold headline in the session's colour (else the agent's), small detail line."""
+    color = resolve_color(agent, color)
     elements = [
-        icon_element(agent, timeout, mood),
+        icon_element(agent, timeout, mood, color),
         text_element("11", sanitize(line_1, 12) or "AGENT", "bold", color, -1, "top_left", timeout),
     ]
     detail = sanitize(line_2)
@@ -148,27 +175,29 @@ def hands_payload(hands: Sequence[Hand], cfg: Config) -> dict[str, Any]:
     ordered = sorted(hands, key=lambda h: h.since)
     if len(ordered) == 1:
         hand = ordered[0]
-        return notice(hand.agent, hand.agent.upper(), f"{hand.reason} - {hand.project}", cfg.ttl, cfg, mood="up")
+        return notice(hand.agent, hand.agent.upper(), f"{hand.reason} - {hand.project}", cfg.ttl, cfg, mood="up", color=hand.color)
     agents = {h.agent.lower() for h in ordered}
     agent = ordered[0].agent if len(agents) == 1 else "agents"
+    colors = {h.color for h in ordered}
+    color = ordered[0].color if len(colors) == 1 else None  # mixed colours fall back to the agent's
     projects = ", ".join(dict.fromkeys(sanitize(h.project, 20) for h in ordered))
-    return notice(agent, f"{len(ordered)} AGENTS", projects, cfg.ttl, cfg, mood="up")
+    return notice(agent, f"{len(ordered)} AGENTS", projects, cfg.ttl, cfg, mood="up", color=color)
 
 
 def done_payload(hand: Hand, message: str, cfg: Config) -> dict[str, Any]:
-    return notice(hand.agent, message, hand.project, cfg.done_seconds, cfg, mood="done")
+    return notice(hand.agent, message, hand.project, cfg.done_seconds, cfg, mood="done", color=hand.color)
 
 
-def hello_payload(agent: str, project: str, cfg: Config) -> dict[str, Any]:
-    return notice(agent, agent.upper(), "ready", max(1, cfg.hello_seconds), cfg)
+def hello_payload(agent: str, project: str, cfg: Config, color: str | None = None) -> dict[str, Any]:
+    return notice(agent, agent.upper(), "ready", max(1, cfg.hello_seconds), cfg, color=color)
 
 
-def choice_payload(agent: str, title: str, options: Sequence[str], index: int, timeout: int, cfg: Config) -> dict[str, Any]:
-    return notice(agent, options[index], f"{index + 1}/{len(options)} {title}", timeout, cfg, mood="up")
+def choice_payload(agent: str, title: str, options: Sequence[str], index: int, timeout: int, cfg: Config, color: str | None = None) -> dict[str, Any]:
+    return notice(agent, options[index], f"{index + 1}/{len(options)} {title}", timeout, cfg, mood="up", color=color)
 
 
-def ask_payload(agent: str, question: str, detail: str, timeout: int, cfg: Config) -> dict[str, Any]:
-    return notice(agent, question, detail, timeout, cfg, mood="up")
+def ask_payload(agent: str, question: str, detail: str, timeout: int, cfg: Config, color: str | None = None) -> dict[str, Any]:
+    return notice(agent, question, detail, timeout, cfg, mood="up", color=color)
 
 
 def texts(payload: dict[str, Any]) -> list[str]:
@@ -261,19 +290,19 @@ class Bar:
             timeout=REQUEST_TIMEOUT,
         )
 
-    async def ask(self, agent: str, question: str, detail: str, timeout: int) -> str:
+    async def ask(self, agent: str, question: str, detail: str, timeout: int, color: str | None = None) -> str:
         """Wheel forward allows, wheel back or Back denies. Returns allow, deny or timeout."""
-        await self.draw(ask_payload(agent, question, detail, timeout, self.cfg))
+        await self.draw(ask_payload(agent, question, detail, timeout, self.cfg, color))
         if self.cfg.dry_run:
             return "timeout"
         async with Gestures(self.client) as gestures:
             gesture = await gestures.next(timeout)
         return {"forward": "allow", "back": "deny", "cancel": "deny"}.get(gesture or "", "timeout")
 
-    async def choose(self, agent: str, title: str, options: Sequence[str], timeout: int) -> str:
+    async def choose(self, agent: str, title: str, options: Sequence[str], timeout: int, color: str | None = None) -> str:
         """Wheel scrolls the options, resting picks one. Returns the label, cancel or timeout."""
         index, moved = 0, False
-        await self.draw(choice_payload(agent, title, options, index, timeout, self.cfg))
+        await self.draw(choice_payload(agent, title, options, index, timeout, self.cfg, color))
         if self.cfg.dry_run:
             return "timeout"
         loop = asyncio.get_running_loop()
@@ -290,7 +319,7 @@ class Bar:
                     return "cancel"
                 index = (index + (1 if gesture == "forward" else -1)) % len(options)
                 moved = True
-                await self.draw(choice_payload(agent, title, options, index, timeout, self.cfg))
+                await self.draw(choice_payload(agent, title, options, index, timeout, self.cfg, color))
 
     async def summary(self) -> str:
         version = await self.client.version()

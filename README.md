@@ -31,7 +31,7 @@ her. The BUSY Bar was already on the desk.
 | <img src="img/hello.png" width="360"> | **Session starts.** Clawd says hello for four seconds. |
 | <img src="img/hand-up.png" width="360"> | **Needs you.** A permission prompt. Arm up, orange LEDs. |
 | <img src="img/your-turn.png" width="360"> | **Your turn.** Claude finished and you have been away a minute. |
-| <img src="img/done.png" width="360"> | **Done.** The turn ended. Happy Clawd for eight seconds. |
+| <img src="img/done.png" width="360"> | **Done.** The turn ended, in the session named with `/rename`, or in that folder. |
 | <img src="img/ask.png" width="360"> | **Ask.** Wheel forward to allow, back to deny. Opt-in. |
 | <img src="img/two-agents.png" width="360"> | **Two sessions.** One strip, one queue. |
 | <img src="img/back.png" width="360"> | **Your side.** The back OLED mirrors the front. |
@@ -74,8 +74,11 @@ To try it for one session only, skip the link and pass the plugin directly:
 | `Notification` permission prompt | arm up, `CLAUDE / permission?` |
 | `Notification` idle, subagent needs input, elicitation | arm up, `CLAUDE / your turn` or `input?` |
 | `UserPromptSubmit`, `SessionEnd` | arm down |
-| `Stop` | `DONE / project`, eight seconds |
+| `Stop` | `DONE / session`, eight seconds |
 | `PermissionRequest`, with `BUSYBAR_ASK=1` | `ALLOW? / Bash: npm test`, then your wheel decides |
+
+The second line names the session: the name you gave it with `/rename`, or
+the folder you started `claude` in.
 
 Hand up and hand down run in the background. Stop and SessionEnd run in the
 foreground, because Claude Code exits right after them in print mode; each

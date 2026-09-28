@@ -66,6 +66,24 @@ def run(cmd: list[str], timeout: float) -> str:
     return proc.stdout
 
 
+def session_label(event: dict) -> str:
+    """What the bar calls this session: the name given with /rename, else the folder.
+
+    Hooks are not told the session name, but Claude Code keeps it next to the
+    transcript as <transcript dir>/<session id>/custom-title.json.
+    """
+    transcript, session_id = event.get("transcript_path"), event.get("session_id")
+    if transcript and session_id:
+        sidecar = Path(transcript).parent / session_id / "custom-title.json"
+        try:
+            title = json.loads(sidecar.read_text()).get("customTitle", "")
+        except (OSError, ValueError, AttributeError):
+            title = ""
+        if isinstance(title, str) and title.strip():
+            return title.strip()
+    return Path(event.get("cwd") or os.getcwd()).name or "project"
+
+
 def tool_summary(tool_name: str, tool_input: dict) -> str:
     """A few words that fit on a 72 pixel strip: what the tool is about to do."""
     if not isinstance(tool_input, dict):
@@ -87,8 +105,7 @@ def main() -> int:
 
     name = event.get("hook_event_name", "")
     session = (event.get("session_id") or "")[:8] or "default"
-    project = Path(event.get("cwd") or os.getcwd()).name or "project"
-    common = ["--agent", AGENT, "--session", session, "--project", project]
+    common = ["--agent", AGENT, "--session", session, "--project", session_label(event)]
 
     cmd = cli_command()
     if cmd is None:

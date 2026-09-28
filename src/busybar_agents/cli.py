@@ -30,7 +30,7 @@ from .state import Hand, HandsFile
 def _add_identity(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--agent", default="agent", help="who is asking: claude, codex, gemini, ...")
     parser.add_argument("--session", default="default", help="short session id; one hand per session")
-    parser.add_argument("--project", default=Path.cwd().name, help="shown on the bar; defaults to the cwd name")
+    parser.add_argument("--project", default=Path.cwd().name, help="label shown on the bar: a session name or a folder")
 
 
 def build_parser() -> argparse.ArgumentParser:

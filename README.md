@@ -16,22 +16,18 @@
 </p>
 
 Claude Code asks for permission, or waits for your answer, and the bar on your
-desk shows Clawd with an arm up. Its LEDs blink. You reply and the arm comes
+desk shows Clawd, the Claude Code mascot, with an arm up. Its LEDs blink. You reply and the arm comes
 down. The turn ends and Clawd looks happy. Turn the wheel, and the tool call
 is approved without touching the keyboard.
-
-It started with [a post by Caitlin Kalinowski](https://x.com/kalinowski007/status/2096446783883001945)
-asking for a little minibot that does something cute when her AI agents need
-her. The BUSY Bar was already on the desk.
 
 ## What you see
 
 | | |
 | --- | --- |
-| <img src="img/hello.png" width="360"> | **Session starts.** Clawd says hello for four seconds. |
+| <img src="img/hello.png" width="360"> | **Session starts.** Clawd says hello for `BUSYBAR_HELLO_SECONDS`. |
 | <img src="img/hand-up.png" width="360"> | **Needs you.** A permission prompt. Arm up, orange LEDs. |
 | <img src="img/your-turn.png" width="360"> | **Your turn.** Claude finished and you have been away a minute. |
-| <img src="img/done.png" width="360"> | **Done.** The turn ended, in the session named with `/rename`, or in that folder. |
+| <img src="img/done.png" width="360"> | **Done.** The turn ended, in the session named with `/rename`, or in that folder. Stays for `BUSYBAR_DONE_SECONDS`. |
 | <img src="img/ask.png" width="360"> | **Ask.** Wheel forward to allow, back to deny. Opt-in. |
 | <img src="img/two-agents.png" width="360"> | **Two sessions.** One strip, one queue. |
 | <img src="img/back.png" width="360"> | **Your side.** The back OLED mirrors the front. |
@@ -70,11 +66,11 @@ To try it for one session only, skip the link and pass the plugin directly:
 
 | Claude Code event | Bar |
 | --- | --- |
-| `SessionStart` | `CLAUDE / ready`, four seconds |
+| `SessionStart` | `CLAUDE / ready` for `BUSYBAR_HELLO_SECONDS` |
 | `Notification` permission prompt | arm up, `CLAUDE / permission?` |
 | `Notification` idle, subagent needs input, elicitation | arm up, `CLAUDE / your turn` or `input?` |
 | `UserPromptSubmit`, `SessionEnd` | arm down |
-| `Stop` | `DONE / session`, eight seconds |
+| `Stop` | `DONE / session` for `BUSYBAR_DONE_SECONDS` |
 | `PermissionRequest`, with `BUSYBAR_ASK=1` | `ALLOW? / Bash: npm test`, then your wheel decides |
 
 The second line names the session: the name you gave it with `/rename`, or

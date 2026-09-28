@@ -6,6 +6,7 @@
     busybar-agents ask    --question "ALLOW?" --detail "Bash: npm test"    # prints allow|deny|timeout
     busybar-agents choose --title Framework --option React --option Vue     # prints label|cancel|timeout
     busybar-agents hello  --agent claude --project api
+    busybar-agents wheel  on | off | status                                  # answer from the wheel, every session
     busybar-agents status | redraw | clear
 
 Adapters translate each agent's hook events into these verbs.
@@ -16,6 +17,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import sys
 import time
 from pathlib import Path
@@ -23,7 +25,7 @@ from pathlib import Path
 from . import __version__
 from .bar import Bar, done_payload, hands_payload, hello_payload, print_error
 from .config import Config
-from .state import Hand, HandsFile
+from .state import Hand, HandsFile, WheelFile
 
 
 def _add_identity(parser: argparse.ArgumentParser) -> None:
@@ -64,6 +66,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--title", default="?", help="short title under the option")
     p.add_argument("--option", action="append", required=True, help="option label, repeatable")
     p.add_argument("--timeout", type=int, default=None, help="seconds, default BUSYBAR_ASK_TIMEOUT")
+
+    p = sub.add_parser("wheel", help="answer permissions and questions from the wheel: on, off or status")
+    p.add_argument("state", nargs="?", default="status", choices=["on", "off", "status"])
 
     sub.add_parser("redraw", help="draw the recorded hands again")
     sub.add_parser("clear", help="lower every hand, clear the bar")
@@ -109,6 +114,8 @@ async def perform(args: argparse.Namespace, cfg: Config, hands_file: HandsFile, 
         else:
             await bar.clear()
         return answer
+    elif args.command == "wheel":
+        return wheel_report(args.state, cfg)
     elif args.command == "redraw":
         hands = hands_file.load()
         if hands:
@@ -121,8 +128,23 @@ async def perform(args: argparse.Namespace, cfg: Config, hands_file: HandsFile, 
     return None
 
 
+def wheel_report(state: str, cfg: Config) -> str:
+    """Set or read the wheel switch; one line for the user."""
+    wheel = WheelFile(cfg.wheel_path)
+    current = wheel.write(state == "on") if state != "status" else wheel.read()
+    line = "wheel on: ALLOW?, choices and GO? come to the bar" if current["ask"] or current["go"] else "wheel off: everything stays in the terminal"
+    overrides = [name for name in ("BUSYBAR_ASK", "BUSYBAR_GO") if os.environ.get(name, "").strip()]
+    if overrides:
+        line += f"; {' and '.join(overrides)} in the environment wins until the agent restarts"
+    return line
+
+
 async def _run(args: argparse.Namespace, cfg: Config) -> int:
     hands_file = HandsFile(cfg.state_path)
+
+    if args.command == "wheel":
+        print(await perform(args, cfg, hands_file, None))
+        return 0
 
     if args.command == "status":
         hands = hands_file.prune(cfg.ttl)

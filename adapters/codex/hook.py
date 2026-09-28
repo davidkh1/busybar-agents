@@ -25,8 +25,21 @@ from pathlib import Path
 AGENT = "codex"
 
 
+WHEEL_KEYS = {"BUSYBAR_ASK": "ask", "BUSYBAR_GO": "go"}
+
+
 def flag(name: str) -> bool:
-    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+    """A set variable decides; otherwise the wheel file written by `busybar-agents wheel on`."""
+    value = os.environ.get(name, "").strip()
+    if value:
+        return value.lower() in {"1", "true", "yes", "on"}
+    key = WHEEL_KEYS.get(name)
+    if not key:
+        return False
+    try:
+        return bool(json.loads(state_path().with_name("wheel.json").read_text()).get(key))
+    except (OSError, ValueError, AttributeError):
+        return False
 
 
 def ends_with_question(text: str) -> bool:

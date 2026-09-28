@@ -107,3 +107,17 @@ def test_color_is_recorded_with_the_hand(tmp_path):
     assert hands_file.load()[0].color == "pink"
     run(hands_file, FakeBar(), "raise", "--agent", "claude", "--session", "s2")
     assert [h.color for h in hands_file.load()] == ["pink", None]
+
+
+def test_wheel_switch_is_a_file_beside_the_hands(tmp_path, monkeypatch):
+    for name in ("BUSYBAR_ASK", "BUSYBAR_GO"):
+        monkeypatch.delenv(name, raising=False)
+    cfg = Config(state_path=tmp_path / "hands.json")
+    hands_file = HandsFile(cfg.state_path)
+    assert run(hands_file, None, "wheel", cfg=cfg).startswith("wheel off")
+    assert run(hands_file, None, "wheel", "on", cfg=cfg).startswith("wheel on")
+    assert (tmp_path / "wheel.json").read_text() == '{"ask": true, "go": true}'
+    assert run(hands_file, None, "wheel", "status", cfg=cfg).startswith("wheel on")
+    monkeypatch.setenv("BUSYBAR_GO", "0")
+    assert "BUSYBAR_GO in the environment wins" in run(hands_file, None, "wheel", "off", cfg=cfg)
+    assert (tmp_path / "wheel.json").read_text() == '{"ask": false, "go": false}'

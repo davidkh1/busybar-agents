@@ -11,6 +11,9 @@ Standard library only. Never blocks Claude on a missing bar or CLI.
   PermissionRequest, BUSYBAR_ASK=1           ALLOW? on the wheel, decision returned
   PreToolUse AskUserQuestion, BUSYBAR_ASK=1  options on the wheel, answers returned
 
+`busybar-agents wheel on` switches both without the variables; /busybar-agents:wheel
+runs it through this file (``hook.py wheel on|off|status``).
+
 Stop and SessionEnd run in the foreground: Claude Code exits right after
 them in print mode and would skip a background hook.
 """
@@ -35,8 +38,21 @@ REASONS = {
 }
 
 
+WHEEL_KEYS = {"BUSYBAR_ASK": "ask", "BUSYBAR_GO": "go"}
+
+
 def flag(name: str) -> bool:
-    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+    """A set variable decides; otherwise the wheel file written by `busybar-agents wheel on`."""
+    value = os.environ.get(name, "").strip()
+    if value:
+        return value.lower() in {"1", "true", "yes", "on"}
+    key = WHEEL_KEYS.get(name)
+    if not key:
+        return False
+    try:
+        return bool(json.loads(state_path().with_name("wheel.json").read_text()).get(key))
+    except (OSError, ValueError, AttributeError):
+        return False
 
 
 def ends_with_question(text: str) -> bool:
@@ -118,6 +134,18 @@ def session_color(event: dict) -> str | None:
     return color
 
 
+def state_path() -> Path:
+    """Same rule as busybar_agents.config."""
+    explicit = os.environ.get("BUSYBAR_STATE")
+    if explicit:
+        return Path(explicit)
+    if sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state")
+    return base / "busybar-agents" / "hands.json"
+
+
 def tool_summary(tool_name: str, tool_input: dict) -> str:
     """Tool name and its main argument, short enough for the strip."""
     if not isinstance(tool_input, dict):
@@ -130,6 +158,13 @@ def tool_summary(tool_name: str, tool_input: dict) -> str:
 
 
 def main() -> int:
+    if sys.argv[1:2] == ["wheel"]:  # the /busybar-agents:wheel command, not a hook event
+        cmd = cli_command()
+        if cmd is None:
+            print("busybar-agents: CLI not found; install uv or set BUSYBAR_AGENTS_BIN")
+            return 0
+        print(run(cmd + ["wheel", *sys.argv[2:3]], timeout=30).strip() or "busybar-agents: no answer from the CLI")
+        return 0
     try:
         event = json.load(sys.stdin)
     except (json.JSONDecodeError, OSError):

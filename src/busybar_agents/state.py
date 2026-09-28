@@ -109,3 +109,25 @@ class HandsFile:
     def clear(self) -> None:
         with self._locked():
             self._write([])
+
+
+class WheelFile:
+    """The wheel switch set from inside a session; hooks read it under the BUSYBAR_ASK/GO variables."""
+
+    def __init__(self, path: Path):
+        self.path = path
+
+    def read(self) -> dict[str, bool]:
+        try:
+            raw = json.loads(self.path.read_text())
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {"ask": False, "go": False}
+        return {key: bool(raw.get(key)) for key in ("ask", "go")}
+
+    def write(self, on: bool) -> dict[str, bool]:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        state = {"ask": on, "go": on}
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(state))
+        os.replace(tmp, self.path)
+        return state

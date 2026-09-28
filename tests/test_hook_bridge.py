@@ -118,3 +118,27 @@ def test_color_rides_along_on_every_verb(monkeypatch, capsys, tmp_path):
     assert calls[0][1] == "raise" and calls[0][calls[0].index("--color") + 1] == "pink"
     _, calls = drive(monkeypatch, capsys, event(tmp_path, hook_event_name="Notification", notification_type="idle_prompt"), [])
     assert "--color" not in calls[0]
+
+
+def test_wheel_file_switches_the_flags_unless_a_variable_is_set(monkeypatch, tmp_path):
+    monkeypatch.setenv("BUSYBAR_STATE", str(tmp_path / "hands.json"))
+    for name in ("BUSYBAR_ASK", "BUSYBAR_GO"):
+        monkeypatch.delenv(name, raising=False)
+    assert not hook.flag("BUSYBAR_ASK") and not hook.flag("BUSYBAR_GO")
+    (tmp_path / "wheel.json").write_text(json.dumps({"ask": True, "go": True}))
+    assert hook.flag("BUSYBAR_ASK") and hook.flag("BUSYBAR_GO")
+    monkeypatch.setenv("BUSYBAR_GO", "0")
+    assert hook.flag("BUSYBAR_ASK") and not hook.flag("BUSYBAR_GO")
+    (tmp_path / "wheel.json").write_text("{broken")
+    assert not hook.flag("BUSYBAR_ASK")
+    assert not hook.flag("BUSYBAR_OTHER")
+
+
+def test_wheel_command_runs_the_verb_through_the_cli(monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(hook, "cli_command", lambda: ["fake-cli"])
+    monkeypatch.setattr(hook, "run", lambda cmd, timeout: calls.append(cmd) or "wheel on: ALLOW?, choices and GO? come to the bar\n")
+    monkeypatch.setattr(hook.sys, "argv", ["hook.py", "wheel", "on"])
+    assert hook.main() == 0
+    assert calls == [["fake-cli", "wheel", "on"]]
+    assert capsys.readouterr().out.strip() == "wheel on: ALLOW?, choices and GO? come to the bar"

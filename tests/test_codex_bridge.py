@@ -87,3 +87,12 @@ def test_installer_merges_and_removes(monkeypatch, tmp_path):
     monkeypatch.setattr("sys.argv", ["install.py", "--uninstall"])
     assert install.main() == 0
     assert json.loads(path.read_text())["hooks"] == {"Stop": [{"hooks": [{"type": "command", "command": "python3 mine.py"}]}]}
+
+
+def test_wheel_file_switches_the_codex_flags_too(monkeypatch, tmp_path):
+    monkeypatch.setenv("BUSYBAR_STATE", str(tmp_path / "hands.json"))
+    for name in ("BUSYBAR_ASK", "BUSYBAR_GO"):
+        monkeypatch.delenv(name, raising=False)
+    assert not hook.flag("BUSYBAR_ASK")
+    (tmp_path / "wheel.json").write_text(json.dumps({"ask": True, "go": False}))
+    assert hook.flag("BUSYBAR_ASK") and not hook.flag("BUSYBAR_GO")

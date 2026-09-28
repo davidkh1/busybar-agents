@@ -67,7 +67,10 @@ instead of the keyboard:
 BUSYBAR_ASK=1 BUSYBAR_GO=1 claude
 ```
 
-Export them in your shell profile and the command stays plain `claude`.
+Export them in your shell profile and the command stays plain `claude`, or
+flip both from inside a session with `/busybar-agents:wheel on` (`off`,
+`status`). That setting is remembered for every session on this machine; a
+variable in the environment wins over it.
 
 | Claude asks | Top line, bottom line | You |
 | --- | --- | --- |
@@ -85,7 +88,8 @@ python3 busybar-agents/adapters/codex/install.py   # merges into ~/.codex/hooks.
 codex                                               # then /hooks, trust them
 ```
 
-Same hands, same wheel. `install.py --uninstall` removes them.
+Same hands, same wheel, same `busybar-agents wheel on` switch. `install.py
+--uninstall` removes them.
 
 ## Settings
 
@@ -123,6 +127,7 @@ busybar-agents lower  --agent claude --session 1a2b3c4d
 busybar-agents done   --agent claude --session 1a2b3c4d --project api
 busybar-agents ask    --question "ALLOW?" --detail "Bash: npm test"   # allow, deny or timeout
 busybar-agents choose --title Framework --option React --option Vue    # the label, cancel or timeout
+busybar-agents wheel  on | off | status                                 # what /busybar-agents:wheel runs
 busybar-agents hello | status | redraw | clear
 ```
 

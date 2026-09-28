@@ -50,6 +50,11 @@ class Config:
     dry_run: bool = False  # BUSYBAR_DRY_RUN
     state_path: Path = default_state_path()  # BUSYBAR_STATE
 
+    @property
+    def wheel_path(self) -> Path:
+        """The wheel switch file, beside the hands file."""
+        return self.state_path.with_name("wheel.json")
+
     @classmethod
     def from_env(cls) -> Config:
         sound_raw = os.environ.get("BUSYBAR_SOUND", "").strip().lower()

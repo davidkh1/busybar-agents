@@ -25,6 +25,10 @@ class FakeBar:
         self.calls.append(("ask", agent, question, detail, timeout))
         return "allow"
 
+    async def choose(self, agent, title, options, timeout):
+        self.calls.append(("choose", agent, title, list(options), timeout))
+        return options[-1]
+
 
 def run(hands_file, bar, *argv, cfg=None):
     args = build_parser().parse_args(list(argv))
@@ -80,3 +84,9 @@ def test_done_keeps_the_board_when_another_session_is_waiting(tmp_path):
     run(hands, bar, "done", "--agent", "claude", "--session", "a", "--project", "api")
     assert bar.calls[-1] == ("draw", ["CLAUDE", "your turn"])
     assert [h.session for h in hands.load()] == ["b"]
+
+
+def test_choose_prints_the_pick_and_restores_the_strip(tmp_path):
+    bar, hands = FakeBar(), HandsFile(tmp_path / "h.json")
+    assert run(hands, bar, "choose", "--agent", "claude", "--title", "Framework", "--option", "React", "--option", "Vue", "--timeout", "9") == "Vue"
+    assert bar.calls == [("choose", "claude", "Framework", ["React", "Vue"], 9), ("clear",)]

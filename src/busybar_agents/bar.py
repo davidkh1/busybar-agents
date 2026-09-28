@@ -41,6 +41,7 @@ SCROLL_START_DELAY_MS = 1500  # let the eye land on the first words first
 SCROLL_REPEAT_DELAY_MS = 1200
 
 REQUEST_TIMEOUT = 5.0  # seconds; a hook must never hang on an unplugged bar
+DWELL_SECONDS = 2.5  # rest this long on a choice and it is taken
 
 # Icons are XPM2 bitmaps drawn inline: no upload, no extra files, and the
 # element keeps one type, which the firmware insists on for a reused id.
@@ -189,6 +190,11 @@ def hello_payload(agent: str, project: str, cfg: Config) -> dict[str, Any]:
     return notice(agent, agent.upper(), "ready", max(1, cfg.hello_seconds), cfg)
 
 
+def choice_payload(agent: str, title: str, options: Sequence[str], index: int, timeout: int, cfg: Config) -> dict[str, Any]:
+    """One option at a time, big, with its position and the question's short title."""
+    return notice(agent, options[index], f"{index + 1}/{len(options)} {title}", timeout, cfg, mood="up")
+
+
 def ask_payload(agent: str, question: str, detail: str, timeout: int, cfg: Config) -> dict[str, Any]:
     """A question the person answers with the wheel."""
     return notice(agent, question, detail, timeout, cfg, mood="up")
@@ -197,6 +203,47 @@ def ask_payload(agent: str, question: str, detail: str, timeout: int, cfg: Confi
 def texts(payload: dict[str, Any]) -> list[str]:
     """The words a payload shows, in order. Handy for tests and dry runs."""
     return [e["text"] for e in payload["elements"] if e.get("text")]
+
+
+class Gestures:
+    """Physical input from the bar as a queue of ``forward``, ``back`` and ``cancel``."""
+
+    def __init__(self, client: AsyncBusyBar):
+        self.client = client
+        self.queue: asyncio.Queue[str] = asyncio.Queue()
+        self.task: asyncio.Task | None = None
+
+    async def __aenter__(self) -> "Gestures":
+        self.task = asyncio.create_task(self._pump())
+        return self
+
+    async def __aexit__(self, *exc) -> None:
+        if self.task is not None:
+            self.task.cancel()
+            try:
+                await self.task
+            except (asyncio.CancelledError, Exception):
+                pass
+
+    async def _pump(self) -> None:
+        events = importlib.import_module("busylib.features.input_events")
+        try:
+            async for message in self.client.stream_status_ws():
+                if not isinstance(message, dict):
+                    continue
+                for event in events.input_events(message):
+                    if isinstance(event, events.EncoderEvent) and event.delta:
+                        await self.queue.put("forward" if event.delta > 0 else "back")
+                    elif isinstance(event, events.ButtonEvent) and event.is_press and event.button == "back":
+                        await self.queue.put("cancel")
+        except Exception as err:  # the stream dropped; the caller simply times out
+            print_error(f"input stream ended: {type(err).__name__}: {err}")
+
+    async def next(self, timeout: float) -> str | None:
+        try:
+            return await asyncio.wait_for(self.queue.get(), timeout)
+        except asyncio.TimeoutError:
+            return None
 
 
 class Bar:
@@ -217,7 +264,14 @@ class Bar:
         if self.cfg.dry_run:
             print(json.dumps(payload, indent=2))
             return
-        await self.client.api_request("POST", "/api/display/draw", json_payload=payload, timeout=REQUEST_TIMEOUT)
+        try:
+            await self.client.api_request("POST", "/api/display/draw", json_payload=payload, timeout=REQUEST_TIMEOUT)
+        except Exception as err:
+            if "409" not in str(err):
+                raise
+            # A focus session is running and outranks us. Stay quiet: that is
+            # what a focus session is for. BUSYBAR_PRIORITY=91 breaks through.
+            print_error("not drawn: a focus session is running (BUSYBAR_PRIORITY=91 overrides)")
 
     async def clear(self) -> None:
         if self.cfg.dry_run:
@@ -248,22 +302,35 @@ class Bar:
         await self.draw(ask_payload(agent, question, detail, timeout, self.cfg))
         if self.cfg.dry_run:
             return "timeout"
-        try:
-            return await asyncio.wait_for(self._wait_for_gesture(), timeout)
-        except asyncio.TimeoutError:
-            return "timeout"
+        async with Gestures(self.client) as gestures:
+            gesture = await gestures.next(timeout)
+        return {"forward": "allow", "back": "deny", "cancel": "deny"}.get(gesture or "", "timeout")
 
-    async def _wait_for_gesture(self) -> str:
-        events = importlib.import_module("busylib.features.input_events")
-        async for message in self.client.stream_status_ws():
-            if not isinstance(message, dict):
-                continue
-            for event in events.input_events(message):
-                if isinstance(event, events.EncoderEvent) and event.delta:
-                    return "allow" if event.delta > 0 else "deny"
-                if isinstance(event, events.ButtonEvent) and event.is_press and event.button == "back":
-                    return "deny"
-        return "timeout"
+    async def choose(self, agent: str, title: str, options: Sequence[str], timeout: int) -> str:
+        """Scroll through options with the wheel; rest on one to pick it.
+
+        Returns the chosen label, ``cancel`` for the Back button, or ``timeout``
+        when the wheel never moved.
+        """
+        index, moved = 0, False
+        await self.draw(choice_payload(agent, title, options, index, timeout, self.cfg))
+        if self.cfg.dry_run:
+            return "timeout"
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        async with Gestures(self.client) as gestures:
+            while True:
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    return options[index] if moved else "timeout"
+                gesture = await gestures.next(min(remaining, DWELL_SECONDS) if moved else remaining)
+                if gesture is None:
+                    return options[index] if moved else "timeout"
+                if gesture == "cancel":
+                    return "cancel"
+                index = (index + (1 if gesture == "forward" else -1)) % len(options)
+                moved = True
+                await self.draw(choice_payload(agent, title, options, index, timeout, self.cfg))
 
     async def summary(self) -> str:
         """One line about the bar, for ``status``."""

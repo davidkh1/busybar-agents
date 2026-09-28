@@ -72,6 +72,8 @@ To try it for one session only, skip the link and pass the plugin directly:
 | `UserPromptSubmit`, `SessionEnd` | arm down |
 | `Stop` | `DONE / session` for `BUSYBAR_DONE_SECONDS` |
 | `PermissionRequest`, with `BUSYBAR_ASK=1` | `ALLOW? / Bash: npm test`, then your wheel decides |
+| `PreToolUse` for `AskUserQuestion`, with `BUSYBAR_ASK=1` | one option at a time; the wheel scrolls, resting picks |
+| `Stop` after a question, with `BUSYBAR_GO=1` | `GO? / wheel = yes`; wheel forward tells Claude to go ahead |
 
 The second line names the session: the name you gave it with `/rename`, or
 the folder you started `claude` in.
@@ -80,17 +82,35 @@ Hand up and hand down run in the background. Stop and SessionEnd run in the
 foreground, because Claude Code exits right after them in print mode; each
 takes about a quarter of a second.
 
-## Answer from the bar
+## Talk back with the wheel
+
+Three things Claude Code asks you can be answered from the bar, without a
+keyboard. All three are off by default.
 
 ```bash
-BUSYBAR_ASK=1 claude
+BUSYBAR_ASK=1 BUSYBAR_GO=1 claude
 ```
 
-When a tool call needs permission, the bar shows `ALLOW?` and what the tool
-wants to do. Wheel forward allows, wheel back or the Back button denies. Do
-nothing for `BUSYBAR_ASK_TIMEOUT` seconds and the usual terminal prompt
-appears. The terminal waits for that window, so keep it short. The bar's own
-UI sees the gesture too: on the idle screen the wheel only moves a highlight.
+| Claude asks | Bar shows | You do |
+| --- | --- | --- |
+| permission for a tool call | `ALLOW? / Bash: npm test` | wheel forward allows, wheel back or Back denies |
+| a multiple-choice question | `React / 1/3 Framework` | scroll with the wheel, rest on an option to pick it |
+| "shall I…?" at the end of a turn | `GO? / wheel = yes` | wheel forward means go ahead |
+
+Do nothing for `BUSYBAR_ASK_TIMEOUT` seconds and the usual terminal prompt
+appears, so the bar is a shortcut, never a wall. The terminal waits for that
+window, so keep it short. Questions with several picks at once stay in the
+terminal.
+
+Only the wheel and the Back button are used. Start and OK belong to the bar's
+own UI, where they start a session or select a menu item, and the firmware
+sees every press whatever is on screen. The wheel only moves a highlight on
+the idle screen.
+
+**Modes.** The strip works in either selector position, BUSY or CUSTOM, while
+nothing is running. A running focus session outranks the plugin, so hands
+wait quietly until it ends. Set `BUSYBAR_PRIORITY=91` to let agents through
+even then.
 
 ## The command line
 
@@ -101,6 +121,7 @@ busybar-agents raise --agent claude --session 1a2b3c4d --project api --reason "p
 busybar-agents lower --agent claude --session 1a2b3c4d
 busybar-agents done  --agent claude --session 1a2b3c4d --project api
 busybar-agents ask   --question "ALLOW?" --detail "Bash: npm test"   # prints allow, deny or timeout
+busybar-agents choose --title Framework --option React --option Vue     # prints the label, cancel or timeout
 busybar-agents hello --agent claude --project api
 busybar-agents status
 busybar-agents clear
@@ -127,7 +148,9 @@ shell, a Claude Code hook, or any other adapter.
 | `BUSYBAR_DONE_SECONDS` | `8` | How long DONE stays |
 | `BUSYBAR_HELLO_SECONDS` | `4` | Length of the ready blip. `0` turns it off |
 | `BUSYBAR_ASK_TIMEOUT` | `20` | Seconds to wait for the wheel |
-| `BUSYBAR_ASK` | off | `1` lets the Claude Code plugin answer permission prompts from the bar |
+| `BUSYBAR_ASK` | off | `1` lets the plugin answer permission prompts and questions from the bar |
+| `BUSYBAR_GO` | off | `1` offers "go ahead" on the wheel after a turn that ends in a question |
+| `BUSYBAR_GO_SECONDS` | `8` | How long that offer stays |
 | `BUSYBAR_DRY_RUN` | off | `1` prints payloads instead of drawing |
 | `BUSYBAR_STATE` | see below | Where raised hands are recorded |
 | `BUSYBAR_AGENTS_BIN` | unset | Explicit CLI command for the hook bridge |

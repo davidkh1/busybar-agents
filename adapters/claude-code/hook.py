@@ -19,6 +19,10 @@ Events handled:
   Stop               turn finished        -> "done" for a few seconds
   PermissionRequest  only with BUSYBAR_ASK=1: ask on the bar, answer with
                      the wheel, and return the decision to Claude Code
+  PreToolUse         AskUserQuestion, only with BUSYBAR_ASK=1: scroll the
+                     options with the wheel, rest to pick, answer returned
+  Stop               only with BUSYBAR_GO=1 and a turn that ended in a
+                     question: wheel forward means "go ahead"
 """
 
 from __future__ import annotations
@@ -39,6 +43,15 @@ REASONS = {
     "elicitation_dialog": "input?",
     "elicitation_url_dialog": "input?",
 }
+
+
+def flag(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def ends_with_question(text: str) -> bool:
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    return bool(lines) and lines[-1].endswith("?")
 
 
 def cli_command() -> list[str] | None:
@@ -126,9 +139,37 @@ def main() -> int:
     elif name in ("UserPromptSubmit", "SessionEnd"):
         run(cmd + ["lower", *common], timeout=15)
     elif name == "Stop":
+        if flag("BUSYBAR_GO") and not event.get("stop_hook_active") and ends_with_question(event.get("last_assistant_message", "")):
+            seconds = os.environ.get("BUSYBAR_GO_SECONDS", "8")
+            answer = run(cmd + ["ask", *common, "--question", "GO?", "--detail", "wheel = yes", "--timeout", seconds], timeout=40).strip()
+            if answer == "allow":
+                print(json.dumps({"decision": "block", "reason": "The user answered yes from the BUSY Bar: go ahead with what you proposed, without asking again."}))
+                return 0
         run(cmd + ["done", *common], timeout=15)
+    elif name == "PreToolUse":
+        tool_input = event.get("tool_input") or {}
+        questions = tool_input.get("questions") if isinstance(tool_input, dict) else None
+        if event.get("tool_name") != "AskUserQuestion" or not flag("BUSYBAR_ASK") or not questions:
+            return 0
+        if any(q.get("multiSelect") for q in questions):
+            return 0  # several picks at once is a job for the terminal
+        answers = {}
+        for question in questions:
+            labels = [o.get("label", "") for o in question.get("options", []) if o.get("label")]
+            if not labels:
+                return 0
+            args = ["choose", *common, "--title", question.get("header") or "?"]
+            for label in labels:
+                args += ["--option", label]
+            picked = run(cmd + args, timeout=150).strip()
+            if picked not in labels:
+                return 0  # cancelled or timed out: the terminal takes over
+            answers[question.get("question", "")] = picked
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow",
+                          "permissionDecisionReason": "answered on the BUSY Bar",
+                          "updatedInput": {**tool_input, "answers": answers}}}))
     elif name == "PermissionRequest":
-        if os.environ.get("BUSYBAR_ASK", "").strip().lower() not in {"1", "true", "yes", "on"}:
+        if not flag("BUSYBAR_ASK"):
             return 0
         detail = tool_summary(event.get("tool_name", ""), event.get("tool_input") or {})
         answer = run(cmd + ["ask", *common, "--question", "ALLOW?", "--detail", detail], timeout=35)

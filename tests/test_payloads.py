@@ -1,6 +1,6 @@
 import time
 
-from busybar_agents.bar import CLAUDE_ORANGE, CLAWD, PROMPT_GLYPH, ask_payload, done_payload, hands_payload, hello_payload, texts
+from busybar_agents.bar import CLAUDE_ORANGE, CLAWD, PROMPT_GLYPH, ask_payload, choice_payload, done_payload, hands_payload, hello_payload, texts
 from busybar_agents.config import APP_NAME, Config
 from busybar_agents.state import Hand
 
@@ -70,3 +70,9 @@ def test_a_long_bold_headline_scrolls_too():
     payload = done_payload(hand(), "FINISHED!", Config())
     headline = next(e for e in payload["elements"] if e.get("font") == "bold")
     assert headline["scroll_rate"]
+
+
+def test_choice_shows_one_option_with_its_position():
+    payload = choice_payload("claude", "Framework", ["React", "Vue", "Svelte"], 1, 30, Config())
+    assert texts(payload) == ["Vue", "2/3 Framework"]
+    assert all(e["timeout"] == 30 for e in payload["elements"])

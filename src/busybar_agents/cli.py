@@ -4,6 +4,7 @@
     busybar-agents lower --agent claude --session 1a2b3c4d
     busybar-agents done  --agent claude --session 1a2b3c4d --project api
     busybar-agents ask   --question "ALLOW?" --detail "Bash: npm test"   # prints allow|deny|timeout
+    busybar-agents choose --title Framework --option React --option Vue   # prints the label|cancel|timeout
     busybar-agents hello --agent claude --project api                     # 4 s blip: ready
     busybar-agents status
     busybar-agents clear
@@ -59,6 +60,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--detail", default="")
     p.add_argument("--timeout", type=int, default=None, help="seconds; default BUSYBAR_ASK_TIMEOUT")
 
+    p = sub.add_parser("choose", help="scroll options with the wheel, rest to pick; prints the label, cancel or timeout")
+    _add_identity(p)
+    p.add_argument("--title", default="?", help="short title shown under the option")
+    p.add_argument("--option", action="append", required=True, help="an option label; repeat")
+    p.add_argument("--timeout", type=int, default=None, help="seconds; default BUSYBAR_ASK_TIMEOUT")
+
     sub.add_parser("clear", help="lower every hand and clear the bar")
     sub.add_parser("status", help="list raised hands and the bar's state")
     return parser
@@ -91,9 +98,12 @@ async def perform(args: argparse.Namespace, cfg: Config, hands_file: HandsFile, 
     elif args.command == "hello":
         if cfg.hello_seconds > 0:
             await bar.draw(hello_payload(args.agent, args.project, cfg))
-    elif args.command == "ask":
+    elif args.command in ("ask", "choose"):
         timeout = args.timeout or cfg.ask_timeout
-        answer = await bar.ask(args.agent, args.question, args.detail, timeout)
+        if args.command == "ask":
+            answer = await bar.ask(args.agent, args.question, args.detail, timeout)
+        else:
+            answer = await bar.choose(args.agent, args.title, args.option, timeout)
         hands = hands_file.prune(cfg.ttl)
         if hands:
             await bar.draw(hands_payload(hands, cfg))

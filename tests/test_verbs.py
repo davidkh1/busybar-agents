@@ -39,7 +39,7 @@ def test_raise_then_lower_clears(tmp_path):
     bar, hands = FakeBar(), HandsFile(tmp_path / "h.json")
     run(hands, bar, "raise", "--agent", "claude", "--session", "a", "--project", "api", "--reason", "permission?")
     run(hands, bar, "lower", "--agent", "claude", "--session", "a")
-    assert bar.calls == [("draw", ["CLAUDE", "permission?"]), ("clear",)]
+    assert bar.calls == [("draw", ["CLAUDE", "permission? - api"]), ("clear",)]
 
 
 def test_done_then_session_end_keeps_the_done_message(tmp_path):
@@ -55,7 +55,7 @@ def test_lowering_one_of_two_hands_redraws_the_other(tmp_path):
     run(hands, bar, "raise", "--agent", "claude", "--session", "a", "--project", "api", "--reason", "idle")
     run(hands, bar, "raise", "--agent", "codex", "--session", "b", "--project", "web", "--reason", "idle")
     run(hands, bar, "lower", "--agent", "codex", "--session", "b")
-    assert bar.calls[-1] == ("draw", ["CLAUDE", "idle"])
+    assert bar.calls[-1] == ("draw", ["CLAUDE", "idle - api"])
 
 
 def test_ask_prints_the_answer_and_restores_the_strip(tmp_path):
@@ -82,7 +82,7 @@ def test_done_keeps_the_board_when_another_session_is_waiting(tmp_path):
     run(hands, bar, "raise", "--agent", "claude", "--session", "a", "--project", "api", "--reason", "permission?")
     run(hands, bar, "raise", "--agent", "claude", "--session", "b", "--project", "web", "--reason", "your turn")
     run(hands, bar, "done", "--agent", "claude", "--session", "a", "--project", "api")
-    assert bar.calls[-1] == ("draw", ["CLAUDE", "your turn"])
+    assert bar.calls[-1] == ("draw", ["CLAUDE", "your turn - web"])
     assert [h.session for h in hands.load()] == ["b"]
 
 
@@ -90,3 +90,12 @@ def test_choose_prints_the_pick_and_restores_the_strip(tmp_path):
     bar, hands = FakeBar(), HandsFile(tmp_path / "h.json")
     assert run(hands, bar, "choose", "--agent", "claude", "--title", "Framework", "--option", "React", "--option", "Vue", "--timeout", "9") == "Vue"
     assert bar.calls == [("choose", "claude", "Framework", ["React", "Vue"], 9), ("clear",)]
+
+
+def test_redraw_restores_the_board_or_clears(tmp_path):
+    bar, hands = FakeBar(), HandsFile(tmp_path / "h.json")
+    run(hands, bar, "redraw")
+    assert bar.calls == [("clear",)]
+    run(hands, bar, "raise", "--agent", "claude", "--session", "a", "--project", "busybar", "--reason", "your turn")
+    run(hands, bar, "redraw")
+    assert bar.calls[-1] == ("draw", ["CLAUDE", "your turn - busybar"])

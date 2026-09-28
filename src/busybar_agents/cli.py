@@ -7,6 +7,7 @@
     busybar-agents choose --title Framework --option React --option Vue   # prints the label|cancel|timeout
     busybar-agents hello --agent claude --project api                     # 4 s blip: ready
     busybar-agents status
+    busybar-agents redraw
     busybar-agents clear
 
 Adapters for each coding agent translate that agent's hook events into these
@@ -66,6 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--option", action="append", required=True, help="an option label; repeat")
     p.add_argument("--timeout", type=int, default=None, help="seconds; default BUSYBAR_ASK_TIMEOUT")
 
+    sub.add_parser("redraw", help="draw the recorded hands again, or clear if none are up")
     sub.add_parser("clear", help="lower every hand and clear the bar")
     sub.add_parser("status", help="list raised hands and the bar's state")
     return parser
@@ -110,6 +112,12 @@ async def perform(args: argparse.Namespace, cfg: Config, hands_file: HandsFile, 
         else:
             await bar.clear()
         return answer
+    elif args.command == "redraw":
+        hands = hands_file.load()
+        if hands:
+            await bar.draw(hands_payload(hands, cfg))
+        else:
+            await bar.clear()
     elif args.command == "clear":
         hands_file.clear()
         await bar.clear()

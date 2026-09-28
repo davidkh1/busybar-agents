@@ -25,7 +25,7 @@ is approved without touching the keyboard.
 | | |
 | --- | --- |
 | <img src="img/hello.png" width="360"> | **Session starts.** Clawd says hello for `BUSYBAR_HELLO_SECONDS`. |
-| <img src="img/hand-up.png" width="360"> | **Needs you.** A permission prompt. Arm up, orange LEDs. |
+| <img src="img/hand-up.png" width="360"> | **Needs you.** A permission prompt, with the session's name. Arm up, orange LEDs. |
 | <img src="img/your-turn.png" width="360"> | **Your turn.** Claude finished and you have been away a minute. |
 | <img src="img/done.png" width="360"> | **Done.** The turn ended, in the session named with `/rename`, or in that folder. Stays for `BUSYBAR_DONE_SECONDS`. |
 | <img src="img/ask.png" width="360"> | **Ask.** Wheel forward to allow, back to deny. Opt-in. |
@@ -67,15 +67,15 @@ To try it for one session only, skip the link and pass the plugin directly:
 | Claude Code event | Bar |
 | --- | --- |
 | `SessionStart` | `CLAUDE / ready` for `BUSYBAR_HELLO_SECONDS` |
-| `Notification` permission prompt | arm up, `CLAUDE / permission?` |
-| `Notification` idle, subagent needs input, elicitation | arm up, `CLAUDE / your turn` or `input?` |
+| `Notification` permission prompt | arm up, `CLAUDE / permission? - session` |
+| `Notification` idle, subagent needs input, elicitation | arm up, `CLAUDE / your turn - session` or `input? - session` |
 | `UserPromptSubmit`, `SessionEnd` | arm down |
 | `Stop` | `DONE / session` for `BUSYBAR_DONE_SECONDS` |
 | `PermissionRequest`, with `BUSYBAR_ASK=1` | `ALLOW? / Bash: npm test`, then your wheel decides |
 | `PreToolUse` for `AskUserQuestion`, with `BUSYBAR_ASK=1` | one option at a time; the wheel scrolls, resting picks |
 | `Stop` after a question, with `BUSYBAR_GO=1` | `GO? / wheel = yes`; wheel forward tells Claude to go ahead |
 
-The second line names the session: the name you gave it with `/rename`, or
+Wherever a session is named, it is the name you gave it with `/rename`, or
 the folder you started `claude` in.
 
 Hand up and hand down run in the background. Stop and SessionEnd run in the
@@ -124,7 +124,7 @@ codex                                               # then type /hooks and trust
 | Codex event | Bar |
 | --- | --- |
 | `SessionStart` | `CODEX / ready` |
-| `PermissionRequest` | `CODEX / permission?`; with `BUSYBAR_ASK=1` the wheel decides |
+| `PermissionRequest` | `CODEX / permission? - folder`; with `BUSYBAR_ASK=1` the wheel decides |
 | `UserPromptSubmit`, `PostToolUse`, `Interrupt`, `SessionEnd` | hand down |
 | `Stop` | `DONE / folder`; with `BUSYBAR_GO=1` after a question, wheel forward continues |
 
@@ -144,6 +144,7 @@ busybar-agents ask   --question "ALLOW?" --detail "Bash: npm test"   # prints al
 busybar-agents choose --title Framework --option React --option Vue     # prints the label, cancel or timeout
 busybar-agents hello --agent claude --project api
 busybar-agents status
+busybar-agents redraw   # draw the recorded hands again, e.g. after the bar rebooted
 busybar-agents clear
 ```
 

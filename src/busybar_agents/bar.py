@@ -173,7 +173,7 @@ def hands_payload(hands: Sequence[Hand], cfg: Config) -> dict[str, Any]:
     ordered = sorted(hands, key=lambda h: h.since)
     if len(ordered) == 1:
         hand = ordered[0]
-        return notice(hand.agent, hand.agent.upper(), hand.reason, cfg.ttl, cfg, mood="up")
+        return notice(hand.agent, hand.agent.upper(), f"{hand.reason} - {hand.project}", cfg.ttl, cfg, mood="up")
     agents = {h.agent.lower() for h in ordered}
     agent = ordered[0].agent if len(agents) == 1 else "agents"
     projects = ", ".join(dict.fromkeys(sanitize(h.project, 20) for h in ordered))

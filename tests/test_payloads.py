@@ -14,7 +14,7 @@ def test_single_hand_is_the_agent_and_the_reason():
     assert payload["application_name"] == APP_NAME
     assert payload["priority"] == 77
     assert payload["led_notification_color"] == CLAUDE_ORANGE
-    assert texts(payload) == ["CLAUDE", "permission?"]
+    assert texts(payload) == ["CLAUDE", "permission? - api"]
     assert all(e["timeout"] == 600 for e in payload["elements"])
 
 
@@ -62,7 +62,7 @@ def test_long_lines_scroll_after_a_pause_and_short_lines_do_not():
     long = hands_payload([hand(reason="a rather long reason")], Config())
     scrolling = [e for e in long["elements"] if e.get("scroll_rate")]
     assert scrolling and all(e["scroll_start_delay"] == 1500 and e["scroll_repeat_delay"] == 1200 for e in scrolling)
-    short = hands_payload([hand(reason="your turn")], Config())
+    short = done_payload(hand(project="api"), "DONE", Config())
     assert not any(e.get("scroll_rate") for e in short["elements"])
 
 

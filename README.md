@@ -1,141 +1,117 @@
-# busybar-agents
+<p align="center">
+  <img src="img/hand-up.png" width="576" alt="The bar's front strip: Clawd with an arm up, CLAUDE, permission?">
+</p>
 
-Coding agents raise a hand on your [BUSY Bar](https://busy.app) when they need you.
+<h1 align="center">busybar-agents</h1>
 
-![CLAUDE needs permission, on the bar's front strip](docs/hand-up.png)
+<p align="center">
+  Coding agents raise a hand on your <a href="https://busy.app">BUSY Bar</a> when they need you.
+</p>
 
-Claude Code asks for permission, or sits idle waiting for your answer, and the
-bar on your desk shows a pair of eyes, who is asking, which project, and why.
-Its status LEDs blink. You type a reply and the hand goes down. The turn ends
-and a green check shows for a few seconds. Turn the wheel, and the tool call
-is approved or denied without touching the keyboard.
+<p align="center">
+  <a href="https://github.com/davidkh1/busybar-agents/actions/workflows/ci.yml"><img src="https://github.com/davidkh1/busybar-agents/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey" alt="Linux and macOS">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
+</p>
 
-This started with [a post by Caitlin Kalinowski](https://x.com/kalinowski007/status/2096446783883001945)
-asking for "a little minibot that does something cute when my AI agents need my
-attention". The BUSY Bar is already on the desk: a 72x16 LED strip facing the
-room, an OLED facing you, two RGB status LEDs, a speaker, physical buttons,
-and an open HTTP API over USB. This project is the small piece in between.
+Claude Code asks for permission, or waits for your answer, and the bar on your
+desk shows Clawd with an arm up. Its LEDs blink. You reply and the arm comes
+down. The turn ends and Clawd looks happy. Turn the wheel, and the tool call
+is approved without touching the keyboard.
 
-## What happens on the bar
+It started with [a post by Caitlin Kalinowski](https://x.com/kalinowski007/status/2096446783883001945)
+asking for a little minibot that does something cute when her AI agents need
+her. The BUSY Bar was already on the desk.
 
-| Moment | Strip |
+## What you see
+
+| | |
 | --- | --- |
-| A session starts | Clawd, `CLAUDE`, `ready`, four seconds |
-| Claude asks for permission, waits idle, or a subagent needs input | Clawd with an arm up, `CLAUDE`, `permission?` / `your turn` / `input?` |
-| You type a reply, or the session ends | cleared |
-| A turn finishes | happy Clawd, `DONE`, `project`, eight seconds |
-| A tool call needs a decision (opt-in) | Clawd with an arm up, `ALLOW?`, `Bash: npm test` |
-| Two or more agents are waiting | `2 AGENTS`, `api, web` |
+| <img src="img/hello.png" width="360"> | **Session starts.** Clawd says hello for four seconds. |
+| <img src="img/hand-up.png" width="360"> | **Needs you.** A permission prompt. Arm up, orange LEDs. |
+| <img src="img/your-turn.png" width="360"> | **Your turn.** Claude finished and you have been away a minute. |
+| <img src="img/done.png" width="360"> | **Done.** The turn ended. Happy Clawd for eight seconds. |
+| <img src="img/ask.png" width="360"> | **Ask.** Wheel forward to allow, back to deny. Opt-in. |
+| <img src="img/two-agents.png" width="360"> | **Two sessions.** One strip, one queue. |
+| <img src="img/back.png" width="360"> | **Your side.** The back OLED mirrors the front. |
 
-Claude's screens use Claude's orange and Clawd, the Claude Code mascot, as a
-16-pixel bitmap drawn inline. The status LEDs blink in the same colour. Other
+Claude speaks in Claude orange, with Clawd drawn as a 16-pixel bitmap. Other
 agents get a `>_` glyph in their own colour.
 
-![Two agents waiting](docs/two-agents.png)
-![A finished turn](docs/done.png)
+## Setup in a minute
 
-The back OLED mirrors the same notification, so you see it from your side too.
+```bash
+# 1. Plug the bar in over USB. It answers at 10.0.4.20, no drivers.
 
-## Requirements
+# 2. Clone, and link the Claude Code plugin so it loads in every session.
+git clone https://github.com/davidkh1/busybar-agents
+ln -s "$PWD/busybar-agents/adapters/claude-code" ~/.claude/skills/busybar-agents
 
-- A BUSY Bar on firmware 1.2 or later, plugged in over USB. It answers at
-  `10.0.4.20` with no setup. Wi-Fi works too once HTTP access is enabled in the
-  bar's web UI; then set the address and access key below.
-- Linux or macOS. Python 3.10 or newer for the CLI; [uv](https://docs.astral.sh/uv/) makes the install a one-liner.
-- For the Claude Code adapter: Claude Code 2.1 or newer.
+# 3. Open claude. Clawd says ready.
+claude
+```
 
-## Linux and macOS
-
-Both work the same way. The bar appears as a USB network interface on either
-system without drivers, and answers at `10.0.4.20`. The hook bridge runs on
-the system `python3`, including the 3.9 that Apple's developer tools ship,
-while the CLI runs under uv with its own Python 3.10 or newer. CI runs the
-tests on Ubuntu and macOS. Windows is untested.
-
-## Install
+The plugin runs the CLI from the clone through [uv](https://docs.astral.sh/uv/).
+To have `busybar-agents` on your PATH as well:
 
 ```bash
 uv tool install git+https://github.com/davidkh1/busybar-agents
 busybar-agents status
 ```
 
-`status` lists raised hands and confirms the bar answers. Without `uv`,
-`pipx install git+https://github.com/davidkh1/busybar-agents` does the same.
+To try it for one session only, skip the link and pass the plugin directly:
+`claude --plugin-dir ./busybar-agents/adapters/claude-code`.
 
-## Claude Code
+> Permission screens appear in the default permission mode. Auto mode never
+> prompts, so there you get the ready blip, DONE, and "your turn".
 
-The adapter is a Claude Code plugin. Clone the repo and load it for a session:
+## What Claude Code tells the bar
 
-```bash
-git clone https://github.com/davidkh1/busybar-agents
-claude --plugin-dir ./busybar-agents/adapters/claude-code
-```
-
-If `busybar-agents` is not on your PATH, the plugin runs it from the cloned
-repo through `uv run`, so cloning is enough.
-
-To load it in every session without the flag, link the plugin into your
-personal skills directory. Claude Code loads any plugin found there:
-
-```bash
-ln -s "$PWD/busybar-agents/adapters/claude-code" ~/.claude/skills/busybar-agents
-claude plugin list   # shows busybar-agents@skills-dir, Status: loaded
-```
-
-Remove the link to stop loading it.
-
-| Claude Code event | What the bar does |
+| Claude Code event | Bar |
 | --- | --- |
-| `SessionStart` on startup or resume | ready blip |
-| `Notification` with `permission_prompt`, `idle_prompt`, `agent_needs_input`, `elicitation_dialog` | hand up |
-| `UserPromptSubmit`, `SessionEnd` | hand down |
-| `Stop` | done |
-| `PermissionRequest`, only with `BUSYBAR_ASK=1` | ask, then answer Claude Code |
+| `SessionStart` | `CLAUDE / ready`, four seconds |
+| `Notification` permission prompt | arm up, `CLAUDE / permission?` |
+| `Notification` idle, subagent needs input, elicitation | arm up, `CLAUDE / your turn` or `input?` |
+| `UserPromptSubmit`, `SessionEnd` | arm down |
+| `Stop` | `DONE / project`, eight seconds |
+| `PermissionRequest`, with `BUSYBAR_ASK=1` | `ALLOW? / Bash: npm test`, then your wheel decides |
 
-The hand-up and hand-down hooks run in the background. `Stop` and
-`SessionEnd` run in the foreground because Claude Code exits right after them
-in print mode and would skip a background hook; each takes about a quarter of
-a second.
+Hand up and hand down run in the background. Stop and SessionEnd run in the
+foreground, because Claude Code exits right after them in print mode; each
+takes about a quarter of a second.
 
-### Answering from the bar
+## Answer from the bar
 
 ```bash
-BUSYBAR_ASK=1 claude --plugin-dir ./busybar-agents/adapters/claude-code
+BUSYBAR_ASK=1 claude
 ```
 
-When a tool call needs your permission, the bar shows `ALLOW?` and what the
-tool is about to do. Turn the wheel forward to allow, backward or press Back
-to deny. If you do nothing for `BUSYBAR_ASK_TIMEOUT` seconds, the usual prompt
-appears in the terminal.
-
-Two things to know. The terminal prompt waits for that timeout, so keep it
-short. And the bar's own UI still sees the gesture: the wheel only moves a
-highlight on the idle screen, which is why it is the wheel and not the Start
-button, but inside a bar menu it scrolls that menu.
-
-![A question waiting for the wheel](docs/ask.png)
+When a tool call needs permission, the bar shows `ALLOW?` and what the tool
+wants to do. Wheel forward allows, wheel back or the Back button denies. Do
+nothing for `BUSYBAR_ASK_TIMEOUT` seconds and the usual terminal prompt
+appears. The terminal waits for that window, so keep it short. The bar's own
+UI sees the gesture too: on the idle screen the wheel only moves a highlight.
 
 ## The command line
 
-Every adapter ends up calling these, and so can any script or cron job:
+Every adapter calls these. So can any script.
 
 ```bash
-busybar-agents raise --agent claude --session 1a2b3c4d --project api --reason "needs permission"
+busybar-agents raise --agent claude --session 1a2b3c4d --project api --reason "permission?"
 busybar-agents lower --agent claude --session 1a2b3c4d
 busybar-agents done  --agent claude --session 1a2b3c4d --project api
-busybar-agents ask   --question "ALLOW?" --detail "Bash: npm test"    # prints allow, deny or timeout
-busybar-agents hello --agent claude --project api                  # four-second ready blip
+busybar-agents ask   --question "ALLOW?" --detail "Bash: npm test"   # prints allow, deny or timeout
+busybar-agents hello --agent claude --project api
 busybar-agents status
 busybar-agents clear
 ```
 
-One hand per `agent` and `session` pair, so several Claude Code sessions, or
-Claude next to another agent, share the strip: two hands show as `2 AGENTS`
-over the project names, lowering one redraws the other, and a finished turn
-shows DONE only when nobody else is waiting. Hands older than `BUSYBAR_TTL`
-are dropped, so a session that died without lowering its hand does not stay
-up all day. The one thing not shared is the wheel: with `BUSYBAR_ASK=1` in
-two sessions at once, a gesture answers whichever asked first.
+One hand per `agent` and `session`. Several Claude Code sessions, or Claude
+next to another agent, share the strip: two hands read `2 AGENTS` over the
+project names, lowering one redraws the other, and DONE shows only when
+nobody else is waiting. Hands older than `BUSYBAR_TTL` are dropped. The wheel
+is the one thing not shared: a gesture answers whichever session asked first.
 
 ## Configuration
 
@@ -144,35 +120,55 @@ shell, a Claude Code hook, or any other adapter.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `BUSYBAR_ADDR` | `10.0.4.20` | The bar's address. USB is `10.0.4.20`; over Wi-Fi use its LAN address. |
-| `BUSYBAR_TOKEN` | unset | Access key, needed over Wi-Fi only. |
-| `BUSYBAR_PRIORITY` | `50` | Draw priority. `91` or more shows even over a running BUSY session. |
-| `BUSYBAR_SOUND` | off | `1` for the stock `reminder` chime on hand up, or any stock sound name. |
-| `BUSYBAR_TTL` | `1800` | Seconds a hand stays up if nobody lowers it. |
-| `BUSYBAR_DONE_SECONDS` | `8` | How long DONE stays. |
-| `BUSYBAR_HELLO_SECONDS` | `4` | Length of the ready blip at session start. `0` turns it off. |
-| `BUSYBAR_ASK_TIMEOUT` | `20` | Seconds to wait for the wheel before falling back to the terminal. |
-| `BUSYBAR_ASK` | off | `1` lets the Claude Code adapter answer permission prompts from the bar. |
-| `BUSYBAR_DRY_RUN` | off | `1` prints the payloads instead of drawing. |
-| `BUSYBAR_STATE` | `~/.local/state/busybar-agents/hands.json` on Linux, `~/Library/Application Support/busybar-agents/hands.json` on macOS | Where raised hands are recorded. |
-| `BUSYBAR_AGENTS_BIN` | unset | Explicit command for the CLI, for the hook bridge. |
+| `BUSYBAR_ADDR` | `10.0.4.20` | USB address, or the bar's Wi-Fi address |
+| `BUSYBAR_TOKEN` | unset | Access key, needed over Wi-Fi only |
+| `BUSYBAR_PRIORITY` | `50` | `91` or more shows even over a running BUSY session |
+| `BUSYBAR_SOUND` | off | `1` for the stock `reminder` chime on hand up, or any stock sound |
+| `BUSYBAR_TTL` | `1800` | Seconds a hand stays up if nobody lowers it |
+| `BUSYBAR_DONE_SECONDS` | `8` | How long DONE stays |
+| `BUSYBAR_HELLO_SECONDS` | `4` | Length of the ready blip. `0` turns it off |
+| `BUSYBAR_ASK_TIMEOUT` | `20` | Seconds to wait for the wheel |
+| `BUSYBAR_ASK` | off | `1` lets the Claude Code plugin answer permission prompts from the bar |
+| `BUSYBAR_DRY_RUN` | off | `1` prints payloads instead of drawing |
+| `BUSYBAR_STATE` | see below | Where raised hands are recorded |
+| `BUSYBAR_AGENTS_BIN` | unset | Explicit CLI command for the hook bridge |
+
+The state file lives at `~/.local/state/busybar-agents/hands.json` on Linux
+and `~/Library/Application Support/busybar-agents/hands.json` on macOS.
 
 ## How it works
 
 ```
-Claude Code hook ──▶ adapters/claude-code/hook.py ──▶ busybar-agents CLI ──▶ busylib ──▶ HTTP API ──▶ bar
-Codex / Gemini hook ─┘ (adapters to come)                 │
-MCP server (to come) ─────────────────────────────────────┘
+Claude Code hook ──▶ adapters/claude-code/hook.py ──▶ busybar-agents ──▶ busylib ──▶ HTTP API ──▶ bar
+Codex, Gemini hooks ─┘ (adapters to come)                │
+MCP server (to come) ────────────────────────────────────┘
 ```
 
 The CLI records hands in a small JSON file and redraws the strip from the
-whole list, so agents from different vendors never fight over the display.
-Everything it draws or plays is filed under the application name
-`busybar-agents` on the bar, so `busybar-agents clear` removes only its own
-work and leaves the bar's timers and other apps alone. Drawings carry a
-timeout, so an unplugged laptop never leaves a hand up forever.
+whole list, so agents never fight over the display. Everything it draws is
+filed under the application name `busybar-agents`, so `busybar-agents clear`
+removes only its own work and leaves the bar's timers alone. Drawings carry
+a timeout, so an unplugged laptop never leaves an arm up forever. Icons are
+inline bitmaps and sounds are stock; nothing is uploaded to the bar.
 
-Icons are inline bitmaps and sounds are stock; nothing is uploaded to the bar.
+## Linux and macOS
+
+Both work the same way. The bar appears as a USB network interface without
+drivers and answers at `10.0.4.20`. The hook bridge runs on the system
+`python3`, including the 3.9 that Apple's developer tools ship, while the
+CLI runs under uv with its own Python 3.10 or newer. CI runs the tests on
+Ubuntu and macOS. Windows is untested.
+
+## Development
+
+```bash
+git clone https://github.com/davidkh1/busybar-agents
+cd busybar-agents
+uv sync
+uv run pytest                      # no hardware needed
+uv run busybar-agents status       # smoke test with a bar plugged in
+claude plugin validate ./adapters/claude-code
+```
 
 ## Roadmap
 
@@ -181,26 +177,13 @@ Icons are inline bitmaps and sounds are stock; nothing is uploaded to the bar.
 - An MCP server exposing `raise_hand` and `ask_user`, for agents without hooks.
 - A waving Clawd, using the bar's animation element.
 
-## Development
-
-```bash
-git clone https://github.com/davidkh1/busybar-agents
-cd busybar-agents
-uv sync
-uv run pytest
-BUSYBAR_DRY_RUN=1 uv run busybar-agents raise --agent claude --reason "needs permission"
-claude plugin validate ./adapters/claude-code
-```
-
-The tests need no hardware. With a bar plugged in, `uv run busybar-agents status` is the smoke test.
-
 ## Credits
 
 Built on [busylib](https://github.com/busy-app/busylib-py), Flipper Devices'
-MIT-licensed Python client for the bar, and on the bar's
-[open HTTP API](https://docs.busy.app/bar/dev/http-api). Not affiliated with
-Flipper Devices or Anthropic.
+MIT-licensed Python client, and the bar's
+[open HTTP API](https://docs.busy.app/bar/dev/http-api). Clawd belongs to
+Claude Code. Not affiliated with Flipper Devices or Anthropic.
 
 ## License
 
-MIT. Images in `docs/` are CC BY 4.0.
+MIT. Images in `img/` are CC BY 4.0.

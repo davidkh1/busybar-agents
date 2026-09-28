@@ -66,8 +66,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 async def perform(args: argparse.Namespace, cfg: Config, hands_file: HandsFile, bar) -> str | None:
     """Apply one verb to the state file and the bar. ``bar`` needs draw, clear, play and ask."""
+    hands_file.prune(cfg.ttl)  # a session that died without lowering its hand must not linger
     if args.command == "raise":
-        hands_file.prune(cfg.ttl)
         hand = Hand(agent=args.agent, session=args.session, project=args.project, reason=args.reason, since=time.time())
         hands = hands_file.raise_hand(hand)
         await bar.draw(hands_payload(hands, cfg))

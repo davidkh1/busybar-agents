@@ -72,9 +72,17 @@ claude --plugin-dir ./busybar-agents/adapters/claude-code
 ```
 
 If `busybar-agents` is not on your PATH, the plugin runs it from the cloned
-repo through `uv run`, so cloning is enough. To load it in every session
-without the flag, add it to your settings as a plugin or copy the `hooks`
-object from `adapters/claude-code/hooks/hooks.json` into `~/.claude/settings.json`.
+repo through `uv run`, so cloning is enough.
+
+To load it in every session without the flag, link the plugin into your
+personal skills directory. Claude Code loads any plugin found there:
+
+```bash
+ln -s "$PWD/busybar-agents/adapters/claude-code" ~/.claude/skills/busybar-agents
+claude plugin list   # shows busybar-agents@skills-dir, Status: loaded
+```
+
+Remove the link to stop loading it.
 
 | Claude Code event | What the bar does |
 | --- | --- |

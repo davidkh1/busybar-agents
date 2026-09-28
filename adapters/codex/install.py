@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-"""Add the BUSY Bar hooks to Codex CLI, or remove them again.
+"""Add the BUSY Bar hooks to ~/.codex/hooks.json, or remove them.
 
-    python3 adapters/codex/install.py              # merge into ~/.codex/hooks.json
-    python3 adapters/codex/install.py --uninstall  # take ours out, keep the rest
-    python3 adapters/codex/install.py --print      # show the JSON without writing
+    python3 adapters/codex/install.py              # merge ours in
+    python3 adapters/codex/install.py --uninstall  # take ours out
+    python3 adapters/codex/install.py --print      # show the JSON only
 
-Existing hooks in the file are kept. Ours are recognised by the path of
-hook.py in their command, so running this again after moving the repo just
-updates the path. Codex trusts hooks per definition: after installing, open
-Codex and run /hooks to trust them.
+Other hooks in the file are kept. Afterwards, trust the hooks in /hooks.
 """
 
 from __future__ import annotations
@@ -27,8 +24,7 @@ def our_hooks() -> dict:
     def handler(**extra):
         return {"type": "command", "command": COMMAND, **extra}
 
-    # Everything runs in the foreground: Codex 0.144 skips hooks marked async
-    # ("async hooks are not supported yet"), and each call takes well under a second.
+    # All foreground: this Codex skips hooks marked async.
     return {
         "SessionStart": [{"matcher": "startup|resume", "hooks": [handler(timeout=20)]}],
         "UserPromptSubmit": [{"hooks": [handler(timeout=20)]}],
@@ -87,10 +83,7 @@ def main() -> int:
             data["hooks"].setdefault(event, []).extend(entries)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2) + "\n")
-    if args.uninstall:
-        print(f"removed the BUSY Bar hooks from {path}")
-    else:
-        print(f"wrote {path}\nNext: start codex, type /hooks, and trust the busybar-agents hooks.")
+    print(f"removed from {path}" if args.uninstall else f"wrote {path}; now trust the hooks in /hooks")
     return 0
 
 

@@ -1,7 +1,7 @@
 [project]
 name = "busybar-agents"
 version = "0.1.0"
-description = "Let coding agents raise a hand on your BUSY Bar when they need you."
+description = "Coding agents raise a hand on your BUSY Bar when they need you."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"

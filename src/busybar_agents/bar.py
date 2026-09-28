@@ -1,8 +1,7 @@
-"""Everything that touches the bar.
+"""Drawing on the bar and reading its wheel.
 
-Payload builders are pure functions that return the JSON the bar's draw API
-takes, so they can be tested without hardware. ``Bar`` is the only place that
-talks to the device, through busylib.
+Payload builders are pure functions returning the draw API's JSON. ``Bar``
+is the only thing that talks to the device, through busylib.
 """
 
 from __future__ import annotations
@@ -20,33 +19,27 @@ from .config import APP_NAME, Config
 from .state import Hand
 from .text import sanitize
 
-# Anthropic's palette, as #RRGGBBAA. Claude speaks in Claude orange.
+# Anthropic palette, #RRGGBBAA.
 CLAUDE_ORANGE = "#D97757FF"
 IVORY = "#F0EEE6FF"
-AGENT_COLORS = {
-    "claude": CLAUDE_ORANGE,
-    "codex": "#FFFFFFFF",
-    "gemini": "#4C8DF6FF",
-}
+AGENT_COLORS = {"claude": CLAUDE_ORANGE, "codex": "#FFFFFFFF", "gemini": "#4C8DF6FF"}
 DEFAULT_COLOR = "#FFB000FF"
 
-# The front strip is 72x16. A 16 px icon sits at the left edge, text follows.
+# Front strip: 72x16, a 16 px icon at the left, text after it.
 FRONT_WIDTH = 72
 ICON_WIDTH = 16
 TEXT_X = ICON_WIDTH + 2
 TEXT_WIDTH = FRONT_WIDTH - TEXT_X
-SCROLL_THRESHOLD_CHARS = {"bold": 8, "tiny": 12}  # what fits beside the icon, per font
+SCROLL_THRESHOLD_CHARS = {"bold": 8, "tiny": 12}  # longer lines scroll
 SCROLL_RATE = 1200  # pixels per minute
-SCROLL_START_DELAY_MS = 1500  # let the eye land on the first words first
+SCROLL_START_DELAY_MS = 1500
 SCROLL_REPEAT_DELAY_MS = 1200
 
-REQUEST_TIMEOUT = 5.0  # seconds; a hook must never hang on an unplugged bar
-DWELL_SECONDS = 2.5  # rest this long on a choice and it is taken
+REQUEST_TIMEOUT = 5.0  # seconds
+DWELL_SECONDS = 2.5  # resting on an option this long picks it
 
-# Icons are XPM2 bitmaps drawn inline: no upload, no extra files, and the
-# element keeps one type, which the firmware insists on for a reused id.
-# Clawd is the Claude Code mascot, 16x10, with white eyes.
-CLAWD = {
+# Claude Code's mascot, 16x10; "w" is the white of the eyes.
+MASCOT = {
     "ready": [
         "..oooooooooooo..",
         "..oooooooooooo..",
@@ -59,7 +52,7 @@ CLAWD = {
         "...o.o....o.o...",
         "...o.o....o.o...",
     ],
-    "up": [  # right arm raised
+    "up": [  # arm raised
         "..oooooooooooo.o",
         "..oooooooooooo.o",
         "..oowoooooowoo.o",
@@ -71,7 +64,7 @@ CLAWD = {
         "...o.o....o.o...",
         "...o.o....o.o...",
     ],
-    "done": [  # happy, eyes closed
+    "done": [  # eyes closed, happy
         "..oooooooooooo..",
         "..oooooooooooo..",
         "..oooooooooooo..",
@@ -84,7 +77,7 @@ CLAWD = {
         "...o.o....o.o...",
     ],
 }
-# Every other agent: a terminal prompt in its own colour.
+# Other agents: a terminal prompt.
 PROMPT_GLYPH = [
     "..oo............",
     "...oo...........",
@@ -100,7 +93,7 @@ PROMPT_GLYPH = [
 
 
 def xpm(rows: Sequence[str], colors: dict[str, str]) -> str:
-    """Rows of characters plus a colour per character, as XPM2 text."""
+    """Rows of characters plus a colour per character, as XPM2."""
     width = len(rows[0])
     if any(len(row) != width for row in rows):
         raise ValueError("bitmap rows differ in width")
@@ -110,21 +103,13 @@ def xpm(rows: Sequence[str], colors: dict[str, str]) -> str:
 
 
 def icon_element(agent: str, timeout: int, mood: str = "ready") -> dict[str, Any]:
+    """Inline bitmap; one element type for id 10, which the firmware requires."""
     color = AGENT_COLORS.get(agent.lower(), DEFAULT_COLOR)[:7]
     if agent.lower() == "claude":
-        data = xpm(CLAWD[mood], {".": "none", "o": color, "w": "#FFFFFF"})
+        data = xpm(MASCOT[mood], {".": "none", "o": color, "w": "#FFFFFF"})
     else:
         data = xpm(PROMPT_GLYPH, {".": "none", "o": color})
-    return {
-        "id": "10",
-        "type": "xpmbitmap",
-        "x": 0,
-        "y": 8,
-        "align": "mid_left",
-        "display": "front",
-        "timeout": timeout,
-        "data": data,
-    }
+    return {"id": "10", "type": "xpmbitmap", "x": 0, "y": 8, "align": "mid_left", "display": "front", "timeout": timeout, "data": data}
 
 
 def text_element(element_id: str, text: str, font: str, color: str, y: int, align: str, timeout: int) -> dict[str, Any]:
@@ -141,17 +126,12 @@ def text_element(element_id: str, text: str, font: str, color: str, y: int, alig
         "color": color,
     }
     if len(text) > SCROLL_THRESHOLD_CHARS.get(font, 12):
-        element.update(
-            width=TEXT_WIDTH,
-            scroll_rate=SCROLL_RATE,
-            scroll_start_delay=SCROLL_START_DELAY_MS,
-            scroll_repeat_delay=SCROLL_REPEAT_DELAY_MS,
-        )
+        element.update(width=TEXT_WIDTH, scroll_rate=SCROLL_RATE, scroll_start_delay=SCROLL_START_DELAY_MS, scroll_repeat_delay=SCROLL_REPEAT_DELAY_MS)
     return element
 
 
 def notice(agent: str, line_1: str, line_2: str, timeout: int, cfg: Config, mood: str = "ready") -> dict[str, Any]:
-    """Icon, a bold word in the agent's colour, and a small line under it."""
+    """Icon, bold headline in the agent's colour, small detail line."""
     color = AGENT_COLORS.get(agent.lower(), DEFAULT_COLOR)
     elements = [
         icon_element(agent, timeout, mood),
@@ -160,16 +140,11 @@ def notice(agent: str, line_1: str, line_2: str, timeout: int, cfg: Config, mood
     detail = sanitize(line_2)
     if detail:
         elements.append(text_element("12", detail, "tiny", IVORY, 15, "bottom_left", timeout))
-    return {
-        "application_name": APP_NAME,
-        "priority": cfg.priority,
-        "led_notification_color": color,
-        "elements": elements,
-    }
+    return {"application_name": APP_NAME, "priority": cfg.priority, "led_notification_color": color, "elements": elements}
 
 
 def hands_payload(hands: Sequence[Hand], cfg: Config) -> dict[str, Any]:
-    """What the strip shows while at least one hand is up."""
+    """The strip while hands are up."""
     ordered = sorted(hands, key=lambda h: h.since)
     if len(ordered) == 1:
         hand = ordered[0]
@@ -181,32 +156,28 @@ def hands_payload(hands: Sequence[Hand], cfg: Config) -> dict[str, Any]:
 
 
 def done_payload(hand: Hand, message: str, cfg: Config) -> dict[str, Any]:
-    """A short confirmation when an agent finishes its turn."""
     return notice(hand.agent, message, hand.project, cfg.done_seconds, cfg, mood="done")
 
 
 def hello_payload(agent: str, project: str, cfg: Config) -> dict[str, Any]:
-    """A blip when a session starts: the bar is listening to this agent."""
     return notice(agent, agent.upper(), "ready", max(1, cfg.hello_seconds), cfg)
 
 
 def choice_payload(agent: str, title: str, options: Sequence[str], index: int, timeout: int, cfg: Config) -> dict[str, Any]:
-    """One option at a time, big, with its position and the question's short title."""
     return notice(agent, options[index], f"{index + 1}/{len(options)} {title}", timeout, cfg, mood="up")
 
 
 def ask_payload(agent: str, question: str, detail: str, timeout: int, cfg: Config) -> dict[str, Any]:
-    """A question the person answers with the wheel."""
     return notice(agent, question, detail, timeout, cfg, mood="up")
 
 
 def texts(payload: dict[str, Any]) -> list[str]:
-    """The words a payload shows, in order. Handy for tests and dry runs."""
+    """The visible words, in order."""
     return [e["text"] for e in payload["elements"] if e.get("text")]
 
 
 class Gestures:
-    """Physical input from the bar as a queue of ``forward``, ``back`` and ``cancel``."""
+    """Wheel and Back button as a queue of forward, back and cancel."""
 
     def __init__(self, client: AsyncBusyBar):
         self.client = client
@@ -236,7 +207,7 @@ class Gestures:
                         await self.queue.put("forward" if event.delta > 0 else "back")
                     elif isinstance(event, events.ButtonEvent) and event.is_press and event.button == "back":
                         await self.queue.put("cancel")
-        except Exception as err:  # the stream dropped; the caller simply times out
+        except Exception as err:  # stream dropped; the caller times out
             print_error(f"input stream ended: {type(err).__name__}: {err}")
 
     async def next(self, timeout: float) -> str | None:
@@ -247,7 +218,7 @@ class Gestures:
 
 
 class Bar:
-    """An open connection to one bar. Use as ``async with Bar(cfg) as bar``."""
+    """One connection to the bar; use as ``async with Bar(cfg) as bar``."""
 
     def __init__(self, cfg: Config):
         self.cfg = cfg
@@ -269,8 +240,6 @@ class Bar:
         except Exception as err:
             if "409" not in str(err):
                 raise
-            # A focus session is running and outranks us. Stay quiet: that is
-            # what a focus session is for. BUSYBAR_PRIORITY=91 breaks through.
             print_error("not drawn: a focus session is running (BUSYBAR_PRIORITY=91 overrides)")
 
     async def clear(self) -> None:
@@ -280,7 +249,7 @@ class Bar:
         await self.client.display_clear(application_name=APP_NAME, timeout=REQUEST_TIMEOUT)
 
     async def play(self, sound: str) -> None:
-        """Play a stock sound by its short name, e.g. ``reminder`` or ``event``."""
+        """Play a stock sound by short name, e.g. reminder."""
         if self.cfg.dry_run:
             print(json.dumps({"play": sound}))
             return
@@ -293,12 +262,7 @@ class Bar:
         )
 
     async def ask(self, agent: str, question: str, detail: str, timeout: int) -> str:
-        """Show a question and wait for a gesture. Returns allow, deny or timeout.
-
-        Wheel forward means allow, wheel back or the Back button means deny.
-        The bar's own UI still sees the gesture, so the wheel is chosen because
-        it only moves a highlight, where Start would begin a session.
-        """
+        """Wheel forward allows, wheel back or Back denies. Returns allow, deny or timeout."""
         await self.draw(ask_payload(agent, question, detail, timeout, self.cfg))
         if self.cfg.dry_run:
             return "timeout"
@@ -307,11 +271,7 @@ class Bar:
         return {"forward": "allow", "back": "deny", "cancel": "deny"}.get(gesture or "", "timeout")
 
     async def choose(self, agent: str, title: str, options: Sequence[str], timeout: int) -> str:
-        """Scroll through options with the wheel; rest on one to pick it.
-
-        Returns the chosen label, ``cancel`` for the Back button, or ``timeout``
-        when the wheel never moved.
-        """
+        """Wheel scrolls the options, resting picks one. Returns the label, cancel or timeout."""
         index, moved = 0, False
         await self.draw(choice_payload(agent, title, options, index, timeout, self.cfg))
         if self.cfg.dry_run:
@@ -333,7 +293,6 @@ class Bar:
                 await self.draw(choice_payload(agent, title, options, index, timeout, self.cfg))
 
     async def summary(self) -> str:
-        """One line about the bar, for ``status``."""
         version = await self.client.version()
         power = await self.client.status_power()
         return f"BUSY Bar at {self.cfg.addr}: API {version.api_semver}, battery {power.battery_charge}% ({power.state})"

@@ -1,6 +1,6 @@
 import time
 
-from busybar_agents.bar import CLAUDE_ORANGE, CLAWD, PROMPT_GLYPH, ask_payload, choice_payload, done_payload, hands_payload, hello_payload, texts
+from busybar_agents.bar import CLAUDE_ORANGE, MASCOT, PROMPT_GLYPH, ask_payload, choice_payload, done_payload, hands_payload, hello_payload, texts
 from busybar_agents.config import APP_NAME, Config
 from busybar_agents.state import Hand
 
@@ -27,7 +27,7 @@ def test_claude_gets_clawd_and_others_get_a_prompt_glyph():
 
 
 def test_every_bitmap_is_well_formed():
-    for rows in (*CLAWD.values(), PROMPT_GLYPH):
+    for rows in (*MASCOT.values(), PROMPT_GLYPH):
         assert len(rows) == 10 and all(len(row) == 16 for row in rows)
         assert set("".join(rows)) <= {".", "o", "w"}
 

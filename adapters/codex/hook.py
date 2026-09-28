@@ -1,24 +1,16 @@
 #!/usr/bin/env python3
-"""Codex CLI hook bridge: one script for every event, standard library only.
+"""Codex CLI hook bridge: one event in on stdin, one busybar-agents call out.
 
-Codex sends the event as JSON on stdin. This script turns it into one call of
-the ``busybar-agents`` CLI, which does the drawing. It never fails loudly: a
-missing bar or a missing CLI must not slow Codex down.
+Standard library only. Never blocks Codex on a missing bar or CLI.
 
-Events handled:
-  SessionStart       startup or resume     -> short "ready" blip
-  PermissionRequest  approval needed       -> hand up, "permission?"; with
-                     BUSYBAR_ASK=1 the wheel answers and the decision is returned
-  UserPromptSubmit   you typed something   -> hand down
-  PostToolUse        the approved tool ran -> hand down, if one was up
-  Interrupt          you interrupted       -> hand down
-  SessionEnd         session closed        -> hand down
-  Stop               turn finished         -> "done"; with BUSYBAR_GO=1 and a
-                     turn that ended in a question, wheel forward means go ahead
+  SessionStart (startup, resume)              hello
+  PermissionRequest                           raise; BUSYBAR_ASK=1: ALLOW? on the wheel, decision returned
+  UserPromptSubmit, Interrupt, SessionEnd     lower
+  PostToolUse                                 lower, if a hand was up
+  Stop                                        done; BUSYBAR_GO=1: GO? on the wheel after a question
 
-Install with ``python3 adapters/codex/install.py`` and trust the hooks from
-``/hooks`` inside Codex. Every hook runs in the foreground, since this Codex
-skips background hooks; each call takes well under a second.
+Install with ``python3 adapters/codex/install.py``, then trust the hooks in
+``/hooks``. All hooks run in the foreground: this Codex skips async hooks.
 """
 
 from __future__ import annotations
@@ -43,7 +35,7 @@ def ends_with_question(text: str) -> bool:
 
 
 def cli_command() -> list[str] | None:
-    """Find the CLI: explicit override, PATH, or the repo this adapter lives in."""
+    """BUSYBAR_AGENTS_BIN, then PATH, then the repo this file lives in."""
     override = os.environ.get("BUSYBAR_AGENTS_BIN")
     if override:
         return override.split()
@@ -68,7 +60,7 @@ def run(cmd: list[str], timeout: float) -> str:
 
 
 def tool_summary(tool_name: str, tool_input) -> str:
-    """A few words that fit on a 72 pixel strip: what the tool is about to do."""
+    """Tool name and its main argument, short enough for the strip."""
     if not isinstance(tool_input, dict):
         tool_input = {}
     for key in ("command", "description", "file_path", "path", "url", "query"):
@@ -79,7 +71,7 @@ def tool_summary(tool_name: str, tool_input) -> str:
 
 
 def state_path() -> Path:
-    """Where the CLI keeps raised hands; mirrors busybar_agents.config."""
+    """Same rule as busybar_agents.config."""
     explicit = os.environ.get("BUSYBAR_STATE")
     if explicit:
         return Path(explicit)
@@ -91,7 +83,7 @@ def state_path() -> Path:
 
 
 def hand_is_up(session: str) -> bool:
-    """Cheap check so PostToolUse, which fires often, only spawns the CLI when needed."""
+    """Cheap check, so PostToolUse only spawns the CLI when it matters."""
     try:
         hands = json.loads(state_path().read_text()).get("hands", [])
     except (OSError, ValueError, AttributeError):
@@ -114,7 +106,7 @@ def main() -> int:
 
     cmd = cli_command()
     if cmd is None:
-        print("busybar-agents: CLI not found. Install it (uv tool install busybar-agents) or set BUSYBAR_AGENTS_BIN.", file=sys.stderr)
+        print("busybar-agents: CLI not found; install it or set BUSYBAR_AGENTS_BIN", file=sys.stderr)
         return 0
 
     if name == "SessionStart":

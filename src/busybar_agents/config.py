@@ -1,8 +1,4 @@
-"""Configuration, read once from environment variables.
-
-Every knob is an environment variable so the same settings work from a shell,
-from a Claude Code hook, from a Codex hook, or from an MCP server.
-"""
+"""Settings, read once from environment variables."""
 
 from __future__ import annotations
 
@@ -11,12 +7,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-# The bar's address over USB. The firmware fixes it; nothing else should spell it out.
-USB_ADDRESS = "10.0.4.20"
-
-# The application_name every drawing and sound is filed under on the bar.
-# Clearing this name removes everything we drew and nothing anyone else did.
-APP_NAME = "busybar-agents"
+USB_ADDRESS = "10.0.4.20"  # fixed by the bar's firmware
+APP_NAME = "busybar-agents"  # owner of everything we draw or play on the bar
 
 _TRUE = {"1", "true", "yes", "on"}
 _FALSE = {"0", "false", "no", "off", ""}
@@ -24,17 +16,12 @@ _FALSE = {"0", "false", "no", "off", ""}
 
 def _flag(name: str, default: bool = False) -> bool:
     value = os.environ.get(name)
-    if value is None:
-        return default
-    return value.strip().lower() in _TRUE
+    return default if value is None else value.strip().lower() in _TRUE
 
 
 def _int(name: str, default: int) -> int:
-    value = os.environ.get(name)
-    if value is None or not value.strip():
-        return default
     try:
-        return int(value)
+        return int(os.environ.get(name, ""))
     except ValueError:
         return default
 
@@ -49,19 +36,19 @@ def default_state_path() -> Path:
 
 @dataclass(frozen=True)
 class Config:
-    """Runtime settings. See README for the matching environment variables."""
+    """Runtime settings. Each field maps to a BUSYBAR_* variable, see README."""
 
-    addr: str = USB_ADDRESS  # BUSYBAR_ADDR: the USB address, or the bar's Wi-Fi address
-    token: str | None = None  # BUSYBAR_TOKEN: access key, only needed over Wi-Fi
-    priority: int = 50  # BUSYBAR_PRIORITY: 90+ shows over a running BUSY session
-    sound: str | None = None  # BUSYBAR_SOUND: stock sound name, empty/off for silence
-    ttl: int = 1800  # BUSYBAR_TTL: seconds a raised hand survives without a lower
-    done_seconds: int = 8  # BUSYBAR_DONE_SECONDS: how long the done message stays
-    hello_seconds: int = 4  # BUSYBAR_HELLO_SECONDS: blip when a session starts; 0 disables
-    ask_timeout: int = 20  # BUSYBAR_ASK_TIMEOUT: seconds to wait for a button
-    go_seconds: int = 8  # BUSYBAR_GO_SECONDS: window to say "go ahead" after a turn ends
-    dry_run: bool = False  # BUSYBAR_DRY_RUN: print payloads instead of drawing
-    state_path: Path = default_state_path()  # BUSYBAR_STATE: shared hands file
+    addr: str = USB_ADDRESS  # BUSYBAR_ADDR
+    token: str | None = None  # BUSYBAR_TOKEN, Wi-Fi only
+    priority: int = 50  # BUSYBAR_PRIORITY; 91+ overrides a focus session
+    sound: str | None = None  # BUSYBAR_SOUND, a stock sound name
+    ttl: int = 1800  # BUSYBAR_TTL, seconds a hand may stay up
+    done_seconds: int = 8  # BUSYBAR_DONE_SECONDS
+    hello_seconds: int = 4  # BUSYBAR_HELLO_SECONDS; 0 disables
+    ask_timeout: int = 20  # BUSYBAR_ASK_TIMEOUT
+    go_seconds: int = 8  # BUSYBAR_GO_SECONDS
+    dry_run: bool = False  # BUSYBAR_DRY_RUN
+    state_path: Path = default_state_path()  # BUSYBAR_STATE
 
     @classmethod
     def from_env(cls) -> Config:

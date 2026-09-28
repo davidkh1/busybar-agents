@@ -1,17 +1,14 @@
 """The ``busybar-agents`` command line.
 
-    busybar-agents raise --agent claude --session 1a2b3c4d --project api --reason "needs permission"
-    busybar-agents lower --agent claude --session 1a2b3c4d
-    busybar-agents done  --agent claude --session 1a2b3c4d --project api
-    busybar-agents ask   --question "ALLOW?" --detail "Bash: npm test"   # prints allow|deny|timeout
-    busybar-agents choose --title Framework --option React --option Vue   # prints the label|cancel|timeout
-    busybar-agents hello --agent claude --project api                     # 4 s blip: ready
-    busybar-agents status
-    busybar-agents redraw
-    busybar-agents clear
+    busybar-agents raise  --agent claude --session 1a2b3c4d --project api --reason "permission?"
+    busybar-agents lower  --agent claude --session 1a2b3c4d
+    busybar-agents done   --agent claude --session 1a2b3c4d --project api
+    busybar-agents ask    --question "ALLOW?" --detail "Bash: npm test"    # prints allow|deny|timeout
+    busybar-agents choose --title Framework --option React --option Vue     # prints label|cancel|timeout
+    busybar-agents hello  --agent claude --project api
+    busybar-agents status | redraw | clear
 
-Adapters for each coding agent translate that agent's hook events into these
-verbs; the verbs are the same whoever is asking.
+Adapters translate each agent's hook events into these verbs.
 """
 
 from __future__ import annotations
@@ -30,9 +27,9 @@ from .state import Hand, HandsFile
 
 
 def _add_identity(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--agent", default="agent", help="who is asking: claude, codex, gemini, ...")
-    parser.add_argument("--session", default="default", help="short session id; one hand per session")
-    parser.add_argument("--project", default=Path.cwd().name, help="label shown on the bar: a session name or a folder")
+    parser.add_argument("--agent", default="agent", help="claude, codex, ...")
+    parser.add_argument("--session", default="default", help="short session id")
+    parser.add_argument("--project", default=Path.cwd().name, help="session name or folder, shown on the bar")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -41,51 +38,50 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-v", "--verbose", action="store_true", help="show busylib logging")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("raise", help="put a hand up")
+    p = sub.add_parser("raise", help="hand up")
     _add_identity(p)
-    p.add_argument("--reason", default="needs you", help="a few words: needs permission, waiting for you, ...")
+    p.add_argument("--reason", default="needs you", help="a few words, e.g. permission?")
 
-    p = sub.add_parser("lower", help="take the hand down")
+    p = sub.add_parser("lower", help="hand down")
     _add_identity(p)
 
-    p = sub.add_parser("done", help="lower the hand and show a short green DONE")
+    p = sub.add_parser("done", help="hand down, show DONE")
     _add_identity(p)
     p.add_argument("--message", default="DONE")
 
-    p = sub.add_parser("hello", help="short blip that the bar is listening; no state change")
+    p = sub.add_parser("hello", help="short ready blip")
     _add_identity(p)
 
-    p = sub.add_parser("ask", help="show a question, wait for the wheel, print allow|deny|timeout")
+    p = sub.add_parser("ask", help="yes/no on the wheel; prints allow, deny or timeout")
     _add_identity(p)
     p.add_argument("--question", default="ALLOW?")
     p.add_argument("--detail", default="")
-    p.add_argument("--timeout", type=int, default=None, help="seconds; default BUSYBAR_ASK_TIMEOUT")
+    p.add_argument("--timeout", type=int, default=None, help="seconds, default BUSYBAR_ASK_TIMEOUT")
 
-    p = sub.add_parser("choose", help="scroll options with the wheel, rest to pick; prints the label, cancel or timeout")
+    p = sub.add_parser("choose", help="pick one option with the wheel; prints the label, cancel or timeout")
     _add_identity(p)
-    p.add_argument("--title", default="?", help="short title shown under the option")
-    p.add_argument("--option", action="append", required=True, help="an option label; repeat")
-    p.add_argument("--timeout", type=int, default=None, help="seconds; default BUSYBAR_ASK_TIMEOUT")
+    p.add_argument("--title", default="?", help="short title under the option")
+    p.add_argument("--option", action="append", required=True, help="option label, repeatable")
+    p.add_argument("--timeout", type=int, default=None, help="seconds, default BUSYBAR_ASK_TIMEOUT")
 
-    sub.add_parser("redraw", help="draw the recorded hands again, or clear if none are up")
-    sub.add_parser("clear", help="lower every hand and clear the bar")
-    sub.add_parser("status", help="list raised hands and the bar's state")
+    sub.add_parser("redraw", help="draw the recorded hands again")
+    sub.add_parser("clear", help="lower every hand, clear the bar")
+    sub.add_parser("status", help="list hands and the bar's state")
     return parser
 
 
 async def perform(args: argparse.Namespace, cfg: Config, hands_file: HandsFile, bar) -> str | None:
-    """Apply one verb to the state file and the bar. ``bar`` needs draw, clear, play and ask."""
-    hands_file.prune(cfg.ttl)  # a session that died without lowering its hand must not linger
+    """Apply one verb. ``bar`` needs draw, clear, play, ask and choose."""
+    hands_file.prune(cfg.ttl)
     if args.command == "raise":
         hand = Hand(agent=args.agent, session=args.session, project=args.project, reason=args.reason, since=time.time())
-        hands = hands_file.raise_hand(hand)
-        await bar.draw(hands_payload(hands, cfg))
+        await bar.draw(hands_payload(hands_file.raise_hand(hand), cfg))
         if cfg.sound:
             await bar.play(cfg.sound)
     elif args.command == "lower":
         removed, hands = hands_file.take(args.agent, args.session)
         if not removed:
-            return None  # nothing of ours was up; a DONE may be showing, leave it
+            return None  # nothing was up; leave the strip alone
         if hands:
             await bar.draw(hands_payload(hands, cfg))
         else:
@@ -93,7 +89,7 @@ async def perform(args: argparse.Namespace, cfg: Config, hands_file: HandsFile, 
     elif args.command == "done":
         _, hands = hands_file.take(args.agent, args.session)
         if hands:
-            await bar.draw(hands_payload(hands, cfg))  # others are still waiting; they matter more
+            await bar.draw(hands_payload(hands, cfg))  # others still waiting
         else:
             hand = Hand(agent=args.agent, session=args.session, project=args.project, reason="done", since=time.time())
             await bar.draw(done_payload(hand, args.message, cfg))
@@ -136,7 +132,7 @@ async def _run(args: argparse.Namespace, cfg: Config) -> int:
         try:
             async with Bar(cfg) as bar:
                 print(await bar.summary())
-        except Exception as err:  # the bar may simply be unplugged
+        except Exception as err:
             print_error(f"bar not reachable at {cfg.addr}: {err}")
             return 1
         return 0
@@ -153,12 +149,11 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.ERROR)
     if not args.verbose:
         logging.getLogger("busylib").setLevel(logging.ERROR)
-    cfg = Config.from_env()
     try:
-        return asyncio.run(_run(args, cfg))
+        return asyncio.run(_run(args, Config.from_env()))
     except KeyboardInterrupt:
         return 130
-    except Exception as err:  # never a traceback in a hook's stderr
+    except Exception as err:  # hooks want one line, not a traceback
         print_error(f"{type(err).__name__}: {err}")
         return 1
 

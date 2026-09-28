@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="img/your-turn.png" width="576" alt="The bar's front strip: Clawd with an arm up, CLAUDE, your turn">
+  <img src="img/your-turn.png" width="576" alt="The bar's front strip: the Claude Code mascot with an arm up, CLAUDE, your turn">
 </p>
 
 <h1 align="center">busybar-agents</h1>
@@ -16,15 +16,16 @@
 </p>
 
 Claude Code asks for permission, or waits for your answer, and the bar on your
-desk shows Clawd, the Claude Code mascot, with an arm up. Its LEDs blink. You reply and the arm comes
-down. The turn ends and Clawd looks happy. Turn the wheel, and the tool call
+desk shows the Claude Code mascot with an arm up. Its LEDs blink. You reply
+and the arm comes down. The turn ends and the mascot looks happy. Turn the
+wheel, and the tool call
 is approved without touching the keyboard.
 
 ## What you see
 
 | | |
 | --- | --- |
-| <img src="img/hello.png" width="360"> | **Session starts.** Clawd says hello for `BUSYBAR_HELLO_SECONDS`. |
+| <img src="img/hello.png" width="360"> | **Session starts.** Hello for `BUSYBAR_HELLO_SECONDS`. |
 | <img src="img/hand-up.png" width="360"> | **Needs you.** A permission prompt, with the session's name. Arm up, orange LEDs. |
 | <img src="img/your-turn.png" width="360"> | **Your turn.** Claude finished and you have been away a minute. |
 | <img src="img/done.png" width="360"> | **Done.** The turn ended, in the session named with `/rename`, or in that folder. Stays for `BUSYBAR_DONE_SECONDS`. |
@@ -32,35 +33,25 @@ is approved without touching the keyboard.
 | <img src="img/two-agents.png" width="360"> | **Two sessions.** One strip, one queue. |
 | <img src="img/back.png" width="360"> | **Your side.** The back OLED mirrors the front. |
 
-Claude speaks in Claude orange, with Clawd drawn as a 16-pixel bitmap. Other
+Claude speaks in Claude orange, its mascot drawn as a 16-pixel bitmap. Other
 agents get a `>_` glyph in their own colour.
 
-## Setup in a minute
+## Setup
+
+Plug the bar in over USB, then:
 
 ```bash
-# 1. Plug the bar in over USB. No drivers, no setup: it has a fixed USB address.
-
-# 2. Clone, and link the Claude Code plugin so it loads in every session.
 git clone https://github.com/davidkh1/busybar-agents
 ln -s "$PWD/busybar-agents/adapters/claude-code" ~/.claude/skills/busybar-agents
-
-# 3. Open claude. Clawd says ready.
 claude
 ```
 
 The plugin runs the CLI from the clone through [uv](https://docs.astral.sh/uv/).
-To have `busybar-agents` on your PATH as well:
+Optional: `uv tool install git+https://github.com/davidkh1/busybar-agents`
+puts `busybar-agents` on your PATH. For one session only, skip the link and
+run `claude --plugin-dir ./busybar-agents/adapters/claude-code`.
 
-```bash
-uv tool install git+https://github.com/davidkh1/busybar-agents
-busybar-agents status
-```
-
-To try it for one session only, skip the link and pass the plugin directly:
-`claude --plugin-dir ./busybar-agents/adapters/claude-code`.
-
-> Permission screens appear in the default permission mode. Auto mode never
-> prompts, so there you get the ready blip, DONE, and "your turn".
+Permission screens need the default permission mode; auto mode never prompts.
 
 ## What Claude Code tells the bar
 
@@ -184,7 +175,6 @@ and `~/Library/Application Support/busybar-agents/hands.json` on macOS.
 ```
 Claude Code hook ──▶ adapters/claude-code/hook.py ──▶ busybar-agents ──▶ busylib ──▶ HTTP API ──▶ bar
 Codex hook ────────▶ adapters/codex/hook.py ───────────────┘
-Gemini CLI hook (to come), MCP server (to come) ───────────┘
 ```
 
 The CLI records hands in a small JSON file and redraws the strip from the
@@ -213,17 +203,11 @@ uv run busybar-agents status       # smoke test with a bar plugged in
 claude plugin validate ./adapters/claude-code
 ```
 
-## Roadmap
-
-- Gemini CLI adapter, through its `Notification` and `AfterAgent` hooks.
-- An MCP server exposing `raise_hand` and `ask_user`, for agents without hooks.
-- A waving Clawd, using the bar's animation element.
-
 ## Credits
 
 Built on [busylib](https://github.com/busy-app/busylib-py), Flipper Devices'
 MIT-licensed Python client, and the bar's
-[open HTTP API](https://docs.busy.app/bar/dev/http-api). Clawd belongs to
+[open HTTP API](https://docs.busy.app/bar/dev/http-api). The mascot belongs to
 Claude Code. Not affiliated with Flipper Devices or Anthropic.
 
 ## License

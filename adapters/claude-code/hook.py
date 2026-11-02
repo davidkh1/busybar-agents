@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Claude Code hook bridge: one event in on stdin, one busybar-agents call out.
 
-Standard library only. Never blocks Claude on a missing bar or CLI.
+Standard library only. Never blocks Claude on a missing bar or CLI. Every
+event leaves a line in events.jsonl beside the hands file, with the process
+that fired it; ``busybar-agents log`` and ``busybar-agents panel`` read it.
 
   SessionStart (startup, resume)             hello
   Notification (permission, idle, input)     raise
@@ -25,6 +27,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 AGENT = "claude"
@@ -90,9 +93,12 @@ def run(cmd: list[str], timeout: float) -> str:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired) as err:
         print(f"busybar-agents: {err}", file=sys.stderr)
+        log_event(src="hook", agent=AGENT, trace=os.environ.get("BUSYBAR_TRACE"), error=f"{type(err).__name__}: {err}"[:300])
         return ""
-    if proc.returncode != 0 and proc.stderr:
-        print(proc.stderr.strip()[:500], file=sys.stderr)
+    if proc.returncode != 0:
+        if proc.stderr:
+            print(proc.stderr.strip()[:500], file=sys.stderr)
+        log_event(src="hook", agent=AGENT, trace=os.environ.get("BUSYBAR_TRACE"), error=f"exit {proc.returncode}: {proc.stderr.strip()[:300]}".rstrip(": "))
     return proc.stdout
 
 
@@ -157,6 +163,42 @@ def tool_summary(tool_name: str, tool_input: dict) -> str:
     return tool_name or "tool"
 
 
+LOG_NAME = "events.jsonl"
+LOG_MAX_BYTES = 2_000_000
+
+
+def log_event(**fields) -> None:
+    """One JSON line in events.jsonl beside the hands file, the shape busybar_agents.log reads. Never raises."""
+    path = state_path().with_name(LOG_NAME)
+    entry = {"t": round(time.time(), 3), **{key: value for key, value in fields.items() if value is not None}}
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.stat().st_size > LOG_MAX_BYTES:
+            os.replace(path, path.with_name(path.name + ".1"))
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, separators=(",", ":"), default=str) + "\n")
+    except OSError:
+        pass
+
+
+def parents(limit: int = 5) -> list:
+    """The commands of this process's ancestors, nearest first; the agent that fired the hook is among them."""
+    try:
+        table = subprocess.run(["ps", "axo", "pid=,ppid=,command="], capture_output=True, text=True, timeout=3).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    rows = {}
+    for line in table.splitlines():
+        parts = line.split(None, 2)
+        if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit():
+            rows[int(parts[0])] = (int(parts[1]), parts[2].strip())
+    chain, pid = [], os.getppid()
+    while pid > 1 and pid in rows and len(chain) < limit:
+        pid, command = rows[pid]
+        chain.append(command[:120])
+    return chain
+
+
 def main() -> int:
     if sys.argv[1:2] == ["wheel"]:  # the /busybar-agents:wheel command, not a hook event
         cmd = cli_command()
@@ -174,65 +216,107 @@ def main() -> int:
 
     name = event.get("hook_event_name", "")
     session = (event.get("session_id") or "")[:8] or "default"
-    common = ["--agent", AGENT, "--session", session, "--project", session_label(event)]
+    label = session_label(event)
+    common = ["--agent", AGENT, "--session", session, "--project", label]
     color = session_color(event)
     if color:
         common += ["--color", color]
 
+    trace = os.urandom(3).hex()  # shared by this hook's log lines and the CLI's
+    os.environ["BUSYBAR_TRACE"] = trace
+    identity = {"src": "hook", "trace": trace, "agent": AGENT, "event": name, "session": session, "project": label,
+                "color": color, "cwd": event.get("cwd"), "pid": os.getpid(),
+                "entry": os.environ.get("CLAUDE_CODE_ENTRYPOINT"), "term": os.environ.get("TERM_PROGRAM")}
+    lineage: dict = {}
+
+    def note(**fields) -> None:
+        """One log line: who fired this event and what the hook made of it."""
+        if "parents" not in lineage:
+            lineage["parents"] = parents()
+        log_event(**identity, parents=lineage["parents"], **fields)
+
     cmd = cli_command()
     if cmd is None:
+        note(error="CLI not found; install uv or set BUSYBAR_AGENTS_BIN")
         print("busybar-agents: CLI not found; install it or set BUSYBAR_AGENTS_BIN", file=sys.stderr)
         return 0
 
     if name == "SessionStart":
-        if event.get("source", "startup") in ("startup", "resume"):
+        source = event.get("source", "startup")
+        if source in ("startup", "resume"):
+            note(verb="hello", source=source)
             run(cmd + ["hello", *common], timeout=15)
+        else:
+            note(skip="only startup and resume say hello", source=source)
     elif name == "Notification":
-        reason = REASONS.get(event.get("notification_type", ""))
+        kind = event.get("notification_type", "")
+        reason = REASONS.get(kind)
         if reason:
+            note(verb="raise", kind=kind)
             run(cmd + ["raise", *common, "--reason", reason], timeout=15)
+        else:
+            note(skip="not a notification that raises a hand", kind=kind)
     elif name == "PermissionDenied":
+        note(verb="raise", tool=event.get("tool_name"))
         run(cmd + ["raise", *common, "--reason", "blocked"], timeout=15)
     elif name in ("UserPromptSubmit", "SessionEnd"):
+        note(verb="lower")
         run(cmd + ["lower", *common], timeout=15)
     elif name == "Stop":
         if flag("BUSYBAR_GO") and not event.get("stop_hook_active") and ends_with_question(event.get("last_assistant_message", "")):
             seconds = os.environ.get("BUSYBAR_GO_SECONDS", "8")
+            note(verb="ask", detail="GO?")
             answer = run(cmd + ["ask", *common, "--question", "GO?", "--detail", "wheel = yes", "--timeout", seconds], timeout=40).strip()
             if answer == "allow":
+                note(decision="go ahead")
                 print(json.dumps({"decision": "block", "reason": "The user answered yes from the BUSY Bar: go ahead with what you proposed, without asking again."}))
                 return 0
+        note(verb="done")
         run(cmd + ["done", *common], timeout=15)
     elif name == "PreToolUse":
         tool_input = event.get("tool_input") or {}
         questions = tool_input.get("questions") if isinstance(tool_input, dict) else None
-        if event.get("tool_name") != "AskUserQuestion" or not flag("BUSYBAR_ASK") or not questions:
+        if event.get("tool_name") != "AskUserQuestion" or not questions:
+            return 0
+        if not flag("BUSYBAR_ASK"):
+            note(skip="wheel off", tool="AskUserQuestion")
             return 0
         if any(q.get("multiSelect") for q in questions):
-            return 0  # multi-select stays in the terminal
+            note(skip="multi-select stays in the terminal", tool="AskUserQuestion")
+            return 0
         answers = {}
         for question in questions:
             labels = [o.get("label", "") for o in question.get("options", []) if o.get("label")]
             if not labels:
+                note(skip="a question without options", tool="AskUserQuestion")
                 return 0
             args = ["choose", *common, "--title", question.get("header") or "?"]
-            for label in labels:
-                args += ["--option", label]
+            for option in labels:
+                args += ["--option", option]
+            note(verb="choose", tool="AskUserQuestion", detail=question.get("header") or "?")
             picked = run(cmd + args, timeout=150).strip()
             if picked not in labels:
+                note(decision="left to the terminal", result=picked or None)
                 return 0  # cancelled or timed out; the terminal takes over
             answers[question.get("question", "")] = picked
+        note(decision="answered", result=", ".join(answers.values()))
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow",
                           "permissionDecisionReason": "answered on the BUSY Bar",
                           "updatedInput": {**tool_input, "answers": answers}}}))
     elif name == "PermissionRequest":
+        tool = event.get("tool_name", "")
         if not flag("BUSYBAR_ASK"):
+            note(skip="wheel off", tool=tool)
             return 0
-        detail = tool_summary(event.get("tool_name", ""), event.get("tool_input") or {})
+        detail = tool_summary(tool, event.get("tool_input") or {})
+        note(verb="ask", tool=tool, detail=detail)
         answer = run(cmd + ["ask", *common, "--question", "ALLOW?", "--detail", detail], timeout=35).strip()
         if answer in ("allow", "deny"):
+            note(decision=answer)
             decision = {"behavior": answer, "message": f"{answer} from the BUSY Bar"}
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": decision}}))
+        else:
+            note(decision="left to the terminal", result=answer or None)
     return 0
 
 

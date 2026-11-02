@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>BUSY Bar panel</title>
+<style>
+:root {
+  --bg: #0f1115; --surface: #171a21; --surface-2: #1f232c; --border: #2a2f3a;
+  --text: #e8e9ec; --muted: #9aa1ad; --accent: #d97757; --accent-ink: #1b0e08;
+  --good: #0ca30c; --warn: #fab219; --critical: #d03b3b;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #f5f4f0; --surface: #ffffff; --surface-2: #edebe6; --border: #dcd8cf; --text: #1c1c20; --muted: #626a76; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--sans); }
+header { display: flex; align-items: center; gap: 14px; padding: 10px 20px; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 2; flex-wrap: wrap; }
+h1 { font-size: 16px; margin: 0; font-weight: 600; }
+main { padding: 16px; display: grid; gap: 16px; max-width: 1400px; margin: 0 auto; }
+section.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+.row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+.screens { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.screens .cap { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+canvas.screen { image-rendering: pixelated; background: #000; border-radius: 6px; border: 1px solid var(--border); display: block; max-width: 100%; }
+#front { width: 576px; height: 128px; }
+#back { width: 480px; height: 240px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tile { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.tile .label { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .value { font-size: 20px; font-weight: 600; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .sub { font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; background: var(--muted); }
+.dot.good { background: var(--good); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--critical); }
+.meter { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 22%, transparent); margin-top: 8px; overflow: hidden; }
+.meter > i { display: block; height: 100%; background: var(--accent); }
+.meter.warn { background: color-mix(in srgb, var(--warn) 22%, transparent); } .meter.warn > i { background: var(--warn); }
+.meter.bad { background: color-mix(in srgb, var(--critical) 22%, transparent); } .meter.bad > i { background: var(--critical); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; white-space: nowrap; }
+.mono { font-family: var(--mono); font-size: 12px; }
+.muted { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+button { font: inherit; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.small { padding: 2px 8px; font-size: 12px; }
+button:disabled { opacity: .5; cursor: default; }
+input, select { font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; min-width: 0; }
+input[type=text], input[type=number] { width: 100%; }
+label.field { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+.controls { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+.group { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; align-content: start; }
+.group h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.buttons { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.result { font-family: var(--mono); font-size: 12px; color: var(--muted); min-height: 1.3em; overflow-wrap: anywhere; }
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.toolbar input[type=text] { width: 240px; }
+.scroll { overflow-x: auto; }
+#log tr.event { cursor: pointer; }
+#log tr.event:hover, #log tr.event.kin { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+#log tr.error td.what, #log tr.error td.outcome { color: var(--critical); }
+#log td { white-space: nowrap; max-width: 420px; overflow: hidden; text-overflow: ellipsis; }
+#log tr.details td { white-space: normal; max-width: none; background: var(--surface-2); }
+.badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--border); font-family: var(--mono); }
+.badge.hook { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); }
+.badge.panel { border-color: color-mix(in srgb, var(--good) 60%, var(--border)); }
+pre { margin: 0; font: 12px/1.4 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
+.detail-grid { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
+.inputs { max-height: 130px; overflow: auto; font-size: 12px; display: grid; gap: 2px; }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: middle; border: 1px solid var(--border); }
+@media (max-width: 700px) { main { padding: 12px; } .fields { grid-template-columns: 1fr; } #front { height: auto; aspect-ratio: 72 / 16; } #back { height: auto; aspect-ratio: 2 / 1; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>BUSY Bar panel</h1>
+  <span id="conn"><i class="dot"></i><span id="conn-text">connecting…</span></span>
+  <span class="muted mono" id="addr"></span>
+  <span class="muted" style="margin-left:auto" id="meta"></span>
+</header>
+<main>
+  <section class="card">
+    <h2>Screens</h2>
+    <div class="screens">
+      <div><div class="cap">Front · 72 × 16 <span id="front-age" class="mono"></span></div><canvas id="front" class="screen" width="72" height="16"></canvas></div>
+      <div><div class="cap">Back · 160 × 80 <span id="back-age" class="mono"></span></div><canvas id="back" class="screen" width="160" height="80"></canvas></div>
+    </div>
+  </section>
+
+  <section class="card"><h2>Bar</h2><div class="tiles" id="tiles"></div></section>
+
+  <div class="row">
+    <section class="card">
+      <h2>Hands up</h2>
+      <div class="scroll"><table id="hands"><thead><tr><th>Agent</th><th>Session</th><th>Project</th><th>Reason</th><th>Age</th><th>Colour</th><th></th></tr></thead><tbody></tbody></table></div>
+      <div id="no-hands" class="muted">No hands up.</div>
+    </section>
+    <section class="card">
+      <h2>Settings in effect</h2>
+      <table id="settings"><tbody></tbody></table>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Controls</h2>
+    <div class="controls">
+      <div class="group">
+        <h3>Identity for the verbs below</h3>
+        <div class="fields">
+          <label class="field">agent<select id="agent"><option>claude</option><option>codex</option><option>gemini</option><option>agent</option></select></label>
+          <label class="field">session<input type="text" id="session" value="panel"></label>
+          <label class="field">project<input type="text" id="project" value="panel"></label>
+          <label class="field">colour<select id="color"><option value="">agent's default</option><option>red</option><option>orange</option><option>yellow</option><option>green</option><option>cyan</option><option>blue</option><option>purple</option><option>pink</option><option>magenta</option><option>white</option></select></label>
+        </div>
+        <div class="muted" style="font-size:12px">A hand raised here is a real hand: it stays until lowered or until the TTL passes.</div>
+      </div>
+      <div class="group">
+        <h3>Hands</h3>
+        <div class="fields">
+          <label class="field">reason<input type="text" id="reason" value="permission?"></label>
+          <label class="field">done message<input type="text" id="message" value="DONE"></label>
+        </div>
+        <div class="buttons">
+          <button data-verb="hello">Hello</button>
+          <button data-verb="raise" class="primary">Raise</button>
+          <button data-verb="lower">Lower</button>
+          <button data-verb="done">Done</button>
+          <button data-verb="redraw">Redraw</button>
+          <button data-verb="clear">Clear all</button>
+        </div>
+        <div class="result" id="out-hands"></div>
+      </div>
+      <div class="group">
+        <h3>Ask on the wheel</h3>
+        <div class="fields">
+          <label class="field">question<input type="text" id="question" value="ALLOW?"></label>
+          <label class="field">detail<input type="text" id="detail" value="Bash: npm test"></label>
+          <label class="field">timeout, s<input type="number" id="ask-timeout" value="10" min="1" max="120"></label>
+        </div>
+        <div class="buttons"><button id="btn-ask" class="primary">Ask</button><span class="muted" style="font-size:12px">forward allows, back denies</span></div>
+        <div class="result" id="out-ask"></div>
+      </div>
+      <div class="group">
+        <h3>Choose on the wheel</h3>
+        <div class="fields">
+          <label class="field">title<input type="text" id="title" value="Framework"></label>
+          <label class="field">options, comma separated<input type="text" id="options" value="React, Vue, Svelte"></label>
+          <label class="field">timeout, s<input type="number" id="choose-timeout" value="15" min="1" max="180"></label>
+        </div>
+        <div class="buttons"><button id="btn-choose" class="primary">Choose</button><span class="muted" style="font-size:12px">scroll, rest 2.5 s to pick</span></div>
+        <div class="result" id="out-choose"></div>
+      </div>
+      <div class="group">
+        <h3>Wheel and buttons, from software</h3>
+        <div class="buttons">
+          <button data-key="up">Wheel forward</button>
+          <button data-key="down">Wheel back</button>
+          <button data-key="ok">OK</button>
+          <button data-key="back">Back</button>
+          <button data-key="start">Start</button>
+        </div>
+        <div class="result" id="out-input"></div>
+        <label style="font-size:13px"><input type="checkbox" id="watch-inputs"> Watch the bar's wheel, buttons and selector</label>
+        <div class="inputs" id="inputs"></div>
+      </div>
+      <div class="group">
+        <h3>Wheel switch</h3>
+        <div class="muted" style="font-size:12px">Whether ALLOW?, choices and GO? come to the bar, for every session on this machine.</div>
+        <div class="buttons">
+          <button data-wheel="on">On</button>
+          <button data-wheel="off">Off</button>
+          <span id="wheel-state" class="mono muted"></span>
+        </div>
+        <div class="result" id="out-wheel"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Events</h2>
+    <div class="toolbar">
+      <input type="text" id="filter" placeholder="filter: session, verb, project, error…">
+      <label style="font-size:13px"><input type="checkbox" id="errors-only"> errors only</label>
+      <button id="pause">Pause</button>
+      <span class="muted" id="count"></span>
+      <span class="muted mono" id="log-path" style="margin-left:auto"></span>
+    </div>
+    <div class="scroll">
+      <table id="log">
+        <thead><tr><th>Time</th><th>Src</th><th>Agent · session</th><th>What</th><th>Detail</th><th>Outcome</th><th>From</th><th>Trace</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="muted" id="no-events" style="margin-top:8px">No events yet. Start an agent session, or press a button above.</div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (sel) => document.querySelector(sel);
+  const MAX_ROWS = 1000;
+  const SHELLS = new Set(['sh', 'bash', 'zsh', 'fish', 'dash']);
+  const events = [];            // newest first
+  let paused = false, pending = [];
+  const frameAt = {};
+
+  const esc = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const clock = (t) => { const d = new Date(t * 1000); return d.toTimeString().slice(0, 8) + '.' + String(d.getMilliseconds()).padStart(3, '0')[0]; };
+  const ago = (t) => { const s = Math.max(0, Math.round(Date.now() / 1000 - t)); return s < 60 ? s + ' s ago' : Math.round(s / 60) + ' min ago'; };
+  const age = (s) => s < 60 ? s + ' s' : s < 3600 ? Math.floor(s / 60) + ' min' : (s / 3600).toFixed(1) + ' h';
+
+  function agentProcess(parents) {
+    for (const command of parents || []) {
+      const name = String(command).split(' ')[0].split('/').pop();
+      if (name && !SHELLS.has(name) && !/^python3?(\.\d+)?$/.test(name)) return String(command);
+    }
+    return '';
+  }
+
+  function describe(e) {
+    let what, detail = '', outcome = [], from = '';
+    if (e.src === 'hook') {
+      what = [e.event, e.source, e.kind, e.tool].filter(Boolean).join(' ');
+      if (e.verb) what += ' → ' + e.verb;
+      if (e.skip) what += ' · skipped: ' + e.skip;
+      if (e.decision) what += ' · ' + e.decision;
+      detail = [e.detail, e.project].filter(Boolean).join(' · ');
+      const via = [e.entry, e.term].filter(Boolean).join(', ');
+      from = agentProcess(e.parents) + (via ? ' (' + via + ')' : '');
+    } else {
+      what = (e.verb || '?') + (e.key ? ' ' + e.key : '');
+      detail = e.shown ? e.shown.join('  |  ') : (e.project || '');
+      if (e.bar) outcome.push(e.bar.join(', '));
+      from = e.addr || '';
+    }
+    if (e.result != null) outcome.push('= ' + e.result);
+    if (e.ms != null) outcome.push(e.ms + ' ms');
+    if (e.error) outcome = ['⚠ ' + e.error];
+    return { what, detail, outcome: outcome.join('   '), from };
+  }
+
+  function drawXpm(canvas, data) {
+    const lines = String(data).split('\n');
+    if (lines[0] !== '! XPM2') return false;
+    const [w, h, n] = lines[1].trim().split(/\s+/).map(Number);
+    const colors = {};
+    for (let i = 0; i < n; i++) { const m = (lines[2 + i] || '').match(/^(.) c (\S+)/); if (m) colors[m[1]] = m[2]; }
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    for (let y = 0; y < h; y++) {
+      const row = lines[2 + n + y] || '';
+      for (let x = 0; x < w; x++) { const c = colors[row[x]]; if (!c || c === 'none') continue; ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); }
+    }
+    return true;
+  }
+
+  function matches(e) {
+    if ($('#errors-only').checked && !e.error) return false;
+    const needle = $('#filter').value.trim().toLowerCase();
+    return !needle || JSON.stringify(e).toLowerCase().includes(needle);
+  }
+
+  function rowFor(e) {
+    const d = describe(e);
+    const tr = document.createElement('tr');
+    tr.className = 'event' + (e.error ? ' error' : '');
+    tr.dataset.trace = e.trace || '';
+    tr.innerHTML = `<td class="mono muted num">${clock(e.t)}</td><td><span class="badge ${esc(e.src)}">${esc(e.src)}</span></td>` +
+      `<td class="mono">${esc(e.agent || '')} ${esc(e.session || '')}</td><td class="what" title="${esc(d.what)}">${esc(d.what)}</td>` +
+      `<td title="${esc(d.detail)}">${esc(d.detail)}</td><td class="mono outcome" title="${esc(d.outcome)}">${esc(d.outcome)}</td>` +
+      `<td class="muted" title="${esc(d.from)}">${esc(d.from)}</td><td class="mono muted">${esc(e.trace || '')}</td>`;
+    tr.addEventListener('click', () => {
+      const next = tr.nextElementSibling;
+      if (next && next.classList.contains('details')) { next.remove(); return; }
+      const details = document.createElement('tr');
+      details.className = 'details';
+      const td = document.createElement('td');
+      td.colSpan = 8;
+      const grid = document.createElement('div');
+      grid.className = 'detail-grid';
+      const icon = e.payload && (e.payload.elements || []).find((el) => el.type === 'xpmbitmap');
+      if (icon) {
+        const canvas = document.createElement('canvas');
+        canvas.className = 'screen';
+        canvas.style.width = '96px'; canvas.style.height = '60px';
+        if (drawXpm(canvas, icon.data)) grid.appendChild(canvas);
+      }
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(e, null, 2);
+      grid.appendChild(pre);
+      td.appendChild(grid);
+      details.appendChild(td);
+      tr.after(details);
+    });
+    return tr;
+  }
+
+  const tbody = $('#log tbody');
+  tbody.addEventListener('mouseover', (ev) => {
+    const tr = ev.target.closest('tr.event');
+    tbody.querySelectorAll('tr.kin').forEach((row) => row.classList.remove('kin'));
+    if (tr && tr.dataset.trace) tbody.querySelectorAll(`tr.event[data-trace="${tr.dataset.trace}"]`).forEach((row) => row.classList.add('kin'));
+  });
+
+  function renderAll() {
+    tbody.innerHTML = '';
+    let shown = 0;
+    for (const e of events) if (matches(e)) { tbody.appendChild(rowFor(e)); shown++; }
+    $('#count').textContent = shown === events.length ? `${events.length} events` : `${shown} of ${events.length} events`;
+    $('#no-events').style.display = events.length ? 'none' : '';
+  }
+
+  function onLog(e) {
+    if (paused) { pending.push(e); $('#pause').textContent = `Resume (${pending.length})`; return; }
+    events.unshift(e);
+    if (events.length > MAX_ROWS) events.length = MAX_ROWS;
+    if (matches(e)) tbody.prepend(rowFor(e));
+    $('#count').textContent = `${events.length} events`;
+    $('#no-events').style.display = 'none';
+  }
+
+  $('#pause').addEventListener('click', () => {
+    paused = !paused;
+    if (!paused) { for (const e of pending) { events.unshift(e); } pending = []; if (events.length > MAX_ROWS) events.length = MAX_ROWS; renderAll(); }
+    $('#pause').textContent = paused ? 'Resume' : 'Pause';
+  });
+  $('#filter').addEventListener('input', renderAll);
+  $('#errors-only').addEventListener('change', renderAll);
+
+  function onFrame(f) {
+    const canvas = f.display === 0 ? $('#front') : $('#back');
+    const bytes = Uint8Array.from(atob(f.rgb), (c) => c.charCodeAt(0));
+    const img = new ImageData(f.width, f.height);
+    for (let i = 0, j = 0; i < bytes.length; i += 3, j += 4) { img.data[j] = bytes[i]; img.data[j + 1] = bytes[i + 1]; img.data[j + 2] = bytes[i + 2]; img.data[j + 3] = 255; }
+    canvas.getContext('2d').putImageData(img, 0, 0);
+    frameAt[f.display] = Date.now();
+  }
+  setInterval(() => {
+    for (const d of [0, 1]) {
+      const el = d === 0 ? $('#front-age') : $('#back-age');
+      el.textContent = frameAt[d] ? '· changed ' + Math.round((Date.now() - frameAt[d]) / 1000) + ' s ago' : '· no frame yet';
+    }
+  }, 1000);
+
+  const tile = (label, value, sub = '') => `<div class="tile"><div class="label">${label}</div><div class="value">${value}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+
+  function renderState(s) {
+    const bar = s.bar || {};
+    const wheel = s.wheel || { file: {}, env: {} };
+    const wheelOn = !!(wheel.file.ask || wheel.file.go);
+    const env = Object.entries(wheel.env || {}).map(([k, v]) => `${k}=${v}`).join(' ');
+    $('#addr').textContent = s.config.addr + (s.config.dry_run ? ' · dry run, nothing is drawn' : '');
+    $('#conn .dot').className = 'dot ' + (bar.reachable ? 'good' : 'bad');
+    $('#conn-text').textContent = bar.reachable ? 'bar reachable' : 'bar unreachable' + (bar.error ? ' · ' + bar.error : '');
+    $('#meta').textContent = `busybar-agents ${s.version} · ${s.watchers} page${s.watchers === 1 ? '' : 's'} watching`;
+    $('#log-path').textContent = s.config.log;
+    $('#wheel-state').textContent = (wheelOn ? 'on' : 'off') + (env ? ` · ${env} in the environment wins` : '');
+    if (document.activeElement !== $('#watch-inputs')) $('#watch-inputs').checked = !!s.watch_inputs;
+
+    const level = bar.battery == null ? null : Math.max(0, Math.min(100, bar.battery));
+    const sev = level == null ? '' : level < 15 ? 'bad' : level < 35 ? 'warn' : '';
+    const busy = bar.busy ? String(bar.busy).toLowerCase().replace(/_/g, ' ') : null;
+    $('#tiles').innerHTML = [
+      tile('Bar', `<span class="dot ${bar.reachable ? 'good' : 'bad'}"></span>${bar.reachable ? 'reachable' : 'unreachable'}`, bar.checked ? 'checked ' + ago(bar.checked) : 'not checked yet'),
+      tile('Battery · ' + esc(bar.power || '–'), level == null ? '–' : level + '%', `<div class="meter ${sev}"><i style="width:${level ?? 0}%"></i></div>`),
+      tile('Firmware', esc(bar.firmware || '–'), 'API ' + esc(bar.api || '–')),
+      tile('Uptime', esc(bar.uptime || '–'), bar.serial ? 'serial ' + esc(bar.serial) : ''),
+      tile("Bar's own session", esc(busy || '–'), 'while one runs, draws need priority 91 or more'),
+      tile('Link', esc(bar.transport || '–'), bar.usb_mv ? 'USB ' + (bar.usb_mv / 1000).toFixed(2) + ' V' : ''),
+      tile('Brightness · volume', `${esc(bar.brightness ?? '–')} · ${esc(bar.volume ?? '–')}`),
+      tile('Hands up', s.hands.length, s.hands.length ? s.hands.map((h) => esc(h.agent)).join(', ') : ''),
+      tile('Wheel switch', wheelOn ? 'on' : 'off', env ? esc(env) + ' in the environment' : 'ALLOW?, choices and GO? ' + (wheelOn ? 'come to the bar' : 'stay in the terminal')),
+    ].join('');
+
+    const hands = $('#hands tbody');
+    hands.innerHTML = s.hands.map((h) => `<tr><td>${esc(h.agent)}</td><td class="mono">${esc(h.session)}</td><td>${esc(h.project)}</td><td>${esc(h.reason)}</td><td class="num">${age(h.age)}</td>` +
+      `<td>${h.color ? `<span class="swatch" style="background:${esc(h.color)}"></span> ${esc(h.color)}` : '<span class="muted">default</span>'}</td>` +
+      `<td><button class="small" data-lower="${esc(h.agent)}|${esc(h.session)}">Lower</button></td></tr>`).join('');
+    $('#no-hands').style.display = s.hands.length ? 'none' : '';
+    $('#hands').style.display = s.hands.length ? '' : 'none';
+
+    const c = s.config;
+    const rows = [['BUSYBAR_ADDR', c.addr], ['BUSYBAR_TOKEN', c.token ? 'set' : 'unset'], ['BUSYBAR_PRIORITY', c.priority], ['BUSYBAR_SOUND', c.sound || 'off'],
+      ['BUSYBAR_TTL', c.ttl + ' s'], ['BUSYBAR_DONE_SECONDS', c.done_seconds], ['BUSYBAR_HELLO_SECONDS', c.hello_seconds], ['BUSYBAR_ASK_TIMEOUT', c.ask_timeout + ' s'],
+      ['BUSYBAR_GO_SECONDS', c.go_seconds], ['BUSYBAR_DRY_RUN', c.dry_run ? 'on' : 'off'], ['hands file', c.state], ['event log', c.log]];
+    $('#settings tbody').innerHTML = rows.map(([k, v]) => `<tr><td class="mono muted">${esc(k)}</td><td class="mono" style="overflow-wrap:anywhere">${esc(v)}</td></tr>`).join('');
+  }
+
+  function onInput(item) {
+    const list = $('#inputs');
+    const line = document.createElement('div');
+    line.innerHTML = `<span class="mono muted">${clock(item.t)}</span> ${esc(item.kind)} <b>${esc(item.detail)}</b>`;
+    list.prepend(line);
+    while (list.children.length > 30) list.lastChild.remove();
+  }
+
+  async function post(path, body) {
+    const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    try { return await response.json(); } catch { return { ok: false, error: response.status + ' ' + response.statusText }; }
+  }
+  const identity = () => ({ agent: $('#agent').value, session: $('#session').value.trim() || 'panel', project: $('#project').value.trim() || 'panel', color: $('#color').value || undefined });
+  async function act(button, out, path, body, waiting) {
+    button.disabled = true;
+    out.textContent = waiting || '…';
+    try {
+      const data = await post(path, body);
+      out.textContent = data.ok ? `${data.result != null ? data.result : 'ok'} · ${data.ms} ms` : '⚠ ' + data.error;
+    } catch (err) {
+      out.textContent = '⚠ ' + err;
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  document.querySelectorAll('button[data-verb]').forEach((button) => button.addEventListener('click', () => {
+    const verb = button.dataset.verb;
+    const body = { verb, ...identity() };
+    if (verb === 'raise') body.reason = $('#reason').value;
+    if (verb === 'done') body.message = $('#message').value;
+    if (verb === 'clear' && !confirm('Lower every hand and clear the bar?')) return;
+    act(button, $('#out-hands'), '/api/do', body);
+  }));
+  $('#btn-ask').addEventListener('click', () => {
+    const timeout = Number($('#ask-timeout').value) || 10;
+    act($('#btn-ask'), $('#out-ask'), '/api/do', { verb: 'ask', ...identity(), question: $('#question').value, detail: $('#detail').value, timeout }, `turn the wheel… up to ${timeout} s`);
+  });
+  $('#btn-choose').addEventListener('click', () => {
+    const timeout = Number($('#choose-timeout').value) || 15;
+    const options = $('#options').value.split(',').map((o) => o.trim()).filter(Boolean);
+    act($('#btn-choose'), $('#out-choose'), '/api/do', { verb: 'choose', ...identity(), title: $('#title').value, options, timeout }, `scroll the wheel… up to ${timeout} s`);
+  });
+  document.querySelectorAll('button[data-key]').forEach((button) => button.addEventListener('click', () => act(button, $('#out-input'), '/api/input', { key: button.dataset.key })));
+  document.querySelectorAll('button[data-wheel]').forEach((button) => button.addEventListener('click', () => act(button, $('#out-wheel'), '/api/do', { verb: 'wheel', state: button.dataset.wheel })));
+  $('#hands').addEventListener('click', (ev) => {
+    const button = ev.target.closest('button[data-lower]');
+    if (!button) return;
+    const [agent, session] = button.dataset.lower.split('|');
+    act(button, $('#out-hands'), '/api/do', { verb: 'lower', agent, session });
+  });
+  $('#watch-inputs').addEventListener('change', (ev) => post('/api/watch', { inputs: ev.target.checked }));
+
+  const stream = new EventSource('/api/stream?n=200');
+  stream.addEventListener('history', (ev) => { events.length = 0; events.push(...JSON.parse(ev.data).reverse()); renderAll(); });
+  stream.addEventListener('log', (ev) => onLog(JSON.parse(ev.data)));
+  stream.addEventListener('state', (ev) => renderState(JSON.parse(ev.data)));
+  stream.addEventListener('frame', (ev) => onFrame(JSON.parse(ev.data)));
+  stream.addEventListener('input', (ev) => onInput(JSON.parse(ev.data)));
+  stream.onerror = () => { $('#conn .dot').className = 'dot warn'; $('#conn-text').textContent = 'panel disconnected, retrying…'; };
+})();
+</script>
+</body>
+</html>

@@ -139,11 +139,12 @@ def icon_element(agent: str, timeout: int, mood: str = "ready", color: str | Non
     return {"id": "10", "type": "xpmbitmap", "x": 0, "y": 8, "align": "mid_left", "display": "front", "timeout": timeout, "data": data}
 
 
-def text_element(element_id: str, text: str, font: str, color: str, y: int, align: str, timeout: int) -> dict[str, Any]:
+def text_element(element_id: str, text: str, font: str, color: str, y: int, align: str, timeout: int, x: int = TEXT_X) -> dict[str, Any]:
+    """A line of text; from ``x`` to the right edge. Lines too long for that room scroll."""
     element: dict[str, Any] = {
         "id": element_id,
         "type": "text",
-        "x": TEXT_X,
+        "x": x,
         "y": y,
         "align": align,
         "display": "front",
@@ -152,8 +153,9 @@ def text_element(element_id: str, text: str, font: str, color: str, y: int, alig
         "font": font,
         "color": color,
     }
-    if len(text) > SCROLL_THRESHOLD_CHARS.get(font, 12):
-        element.update(width=TEXT_WIDTH, scroll_rate=SCROLL_RATE, scroll_start_delay=SCROLL_START_DELAY_MS, scroll_repeat_delay=SCROLL_REPEAT_DELAY_MS)
+    width = FRONT_WIDTH - x
+    if len(text) > SCROLL_THRESHOLD_CHARS.get(font, 12) * width // TEXT_WIDTH:
+        element.update(width=width, scroll_rate=SCROLL_RATE, scroll_start_delay=SCROLL_START_DELAY_MS, scroll_repeat_delay=SCROLL_REPEAT_DELAY_MS)
     return element
 
 
@@ -189,7 +191,8 @@ def done_payload(hand: Hand, message: str, cfg: Config) -> dict[str, Any]:
 
 
 def hello_payload(agent: str, project: str, cfg: Config, color: str | None = None) -> dict[str, Any]:
-    return notice(agent, agent.upper(), "ready", max(1, cfg.hello_seconds), cfg, color=color)
+    """READY over the session's name, so the blip says which session just started."""
+    return notice(agent, "READY", project, max(1, cfg.hello_seconds), cfg, color=color)
 
 
 def choice_payload(agent: str, title: str, options: Sequence[str], index: int, timeout: int, cfg: Config, color: str | None = None) -> dict[str, Any]:
@@ -198,6 +201,17 @@ def choice_payload(agent: str, title: str, options: Sequence[str], index: int, t
 
 def ask_payload(agent: str, question: str, detail: str, timeout: int, cfg: Config, color: str | None = None) -> dict[str, Any]:
     return notice(agent, question, detail, timeout, cfg, mood="up", color=color)
+
+
+def say_payload(agent: str, text: str, detail: str, seconds: int, cfg: Config, color: str | None = None, icon: bool = True) -> dict[str, Any]:
+    """A free message: bold headline in the colour, small detail line; the agent's mascot unless ``icon`` is off."""
+    if icon:
+        return notice(agent, text, detail, seconds, cfg, color=color)
+    color = resolve_color(agent, color)
+    elements = [text_element("11", sanitize(text, 24) or "HELLO", "bold", color, -1 if detail else 0, "top_left" if detail else "mid_left", seconds, x=0)]
+    if sanitize(detail):
+        elements.append(text_element("12", sanitize(detail), "tiny", IVORY, 15, "bottom_left", seconds, x=0))
+    return {"application_name": APP_NAME, "priority": cfg.priority, "led_notification_color": color, "elements": elements}
 
 
 def texts(payload: dict[str, Any]) -> list[str]:
@@ -246,12 +260,25 @@ class Gestures:
             return None
 
 
+# Read-only endpoints behind ``Bar.snapshot``: key, path, and the value to keep.
+EXTRAS = (
+    ("busy", "/api/busy/snapshot", lambda data: (data.get("snapshot") or {}).get("type")),
+    ("brightness", "/api/display/brightness", lambda data: data.get("value")),
+    ("volume", "/api/audio/volume", lambda data: data.get("volume")),
+    ("transport", "/api/transport", lambda data: data.get("type")),
+)
+
+
 class Bar:
-    """One connection to the bar; use as ``async with Bar(cfg) as bar``."""
+    """One connection to the bar; use as ``async with Bar(cfg) as bar``.
+
+    ``trail`` keeps one short note per step taken on the device, for the event log.
+    """
 
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.client = AsyncBusyBar(cfg.addr, token=cfg.token)
+        self.trail: list[dict[str, Any]] = []
 
     async def __aenter__(self) -> "Bar":
         await self.client.__aenter__()
@@ -260,27 +287,39 @@ class Bar:
     async def __aexit__(self, *exc) -> None:
         await self.client.__aexit__(*exc)
 
+    def _step(self, op: str, note: str, **extra: Any) -> None:
+        self.trail.append({"op": op, "note": note, **extra})
+
     async def draw(self, payload: dict[str, Any]) -> None:
+        shown = texts(payload)
         if self.cfg.dry_run:
             print(json.dumps(payload, indent=2))
+            self._step("draw", "draw:dry-run", texts=shown, payload=payload)
             return
         try:
             await self.client.api_request("POST", "/api/display/draw", json_payload=payload, timeout=REQUEST_TIMEOUT)
         except Exception as err:
             if "409" not in str(err):
+                self._step("draw", "draw:error", texts=shown, payload=payload)
                 raise
+            self._step("draw", "draw:busy", texts=shown, payload=payload)
             print_error("not drawn: a focus session is running (BUSYBAR_PRIORITY=91 overrides)")
+            return
+        self._step("draw", "draw:drawn", texts=shown, payload=payload)
 
     async def clear(self) -> None:
         if self.cfg.dry_run:
             print(json.dumps({"clear": APP_NAME}))
+            self._step("clear", "clear:dry-run")
             return
         await self.client.display_clear(application_name=APP_NAME, timeout=REQUEST_TIMEOUT)
+        self._step("clear", "clear")
 
     async def play(self, sound: str) -> None:
         """Play a stock sound by short name, e.g. reminder."""
         if self.cfg.dry_run:
             print(json.dumps({"play": sound}))
+            self._step("play", f"play:{sound}:dry-run")
             return
         asset = await notification.resolve_sound(self.client, sound, application_name=APP_NAME)
         await self.client.audio_play(
@@ -289,6 +328,7 @@ class Bar:
             application_name=APP_NAME,
             timeout=REQUEST_TIMEOUT,
         )
+        self._step("play", f"play:{sound}")
 
     async def ask(self, agent: str, question: str, detail: str, timeout: int, color: str | None = None) -> str:
         """Wheel forward allows, wheel back or Back denies. Returns allow, deny or timeout."""
@@ -297,6 +337,7 @@ class Bar:
             return "timeout"
         async with Gestures(self.client) as gestures:
             gesture = await gestures.next(timeout)
+        self._step("wheel", f"wheel:{gesture or 'timeout'}")
         return {"forward": "allow", "back": "deny", "cancel": "deny"}.get(gesture or "", "timeout")
 
     async def choose(self, agent: str, title: str, options: Sequence[str], timeout: int, color: str | None = None) -> str:
@@ -311,20 +352,57 @@ class Bar:
             while True:
                 remaining = deadline - loop.time()
                 if remaining <= 0:
+                    self._step("wheel", "wheel:rest" if moved else "wheel:timeout")
                     return options[index] if moved else "timeout"
                 gesture = await gestures.next(min(remaining, DWELL_SECONDS) if moved else remaining)
                 if gesture is None:
+                    self._step("wheel", "wheel:rest" if moved else "wheel:timeout")
                     return options[index] if moved else "timeout"
+                self._step("wheel", f"wheel:{gesture}")
                 if gesture == "cancel":
                     return "cancel"
                 index = (index + (1 if gesture == "forward" else -1)) % len(options)
                 moved = True
                 await self.draw(choice_payload(agent, title, options, index, timeout, self.cfg, color))
 
+    async def press(self, key: str) -> None:
+        """Press a key from software: up and down are wheel steps; ok, back and start the buttons."""
+        from busylib.types import InputKey
+
+        if self.cfg.dry_run:
+            print(json.dumps({"press": key}))
+            self._step("input", f"input:{key}:dry-run")
+            return
+        await self.client.input(InputKey(key))
+        self._step("input", f"input:{key}")
+
+    async def screen(self, display: int = 0) -> bytes:
+        """The live pixels of the front (0, 72x16) or back (1, 160x80) display: RGB, three bytes each."""
+        return await asyncio.wait_for(self.client.screen(display), REQUEST_TIMEOUT)
+
+    async def snapshot(self) -> dict[str, Any]:
+        """Firmware, power, link and the bar's own session, flat, for status and the panel."""
+        info: dict[str, Any] = {"addr": self.cfg.addr}
+        status = await self.client.api_request("GET", "/api/status", timeout=REQUEST_TIMEOUT)
+        if isinstance(status, dict):
+            system, firmware, power, device = ((status.get(key) or {}) for key in ("system", "firmware", "power", "device"))
+            info.update(api=system.get("api_semver"), uptime=system.get("uptime"), firmware=firmware.get("version"),
+                        battery=power.get("battery_charge"), power=power.get("state"), usb_mv=power.get("usb_voltage"),
+                        serial=device.get("serial_number"))
+        for key, path, pick in EXTRAS:
+            try:
+                data = await self.client.api_request("GET", path, timeout=REQUEST_TIMEOUT)
+            except Exception:
+                continue
+            if isinstance(data, dict):
+                info[key] = pick(data)
+        return info
+
     async def summary(self) -> str:
-        version = await self.client.version()
-        power = await self.client.status_power()
-        return f"BUSY Bar at {self.cfg.addr}: API {version.api_semver}, battery {power.battery_charge}% ({power.state})"
+        info = await self.snapshot()
+        return (f"BUSY Bar at {self.cfg.addr}: API {info.get('api')}, firmware {info.get('firmware')}, "
+                f"battery {info.get('battery')}% ({info.get('power')}), {info.get('transport') or 'unknown'} link, "
+                f"bar session {str(info.get('busy') or 'unknown').lower()}")
 
 
 def print_error(message: str) -> None:

@@ -94,6 +94,35 @@ Same hands, same wheel. The switch is
 `uv run --project busybar-agents busybar-agents wheel on`.
 `install.py --uninstall` removes the hooks.
 
+## Watching the bar
+
+Every hook event and every call to the bar is appended to `events.jsonl`,
+beside the hands file: the agent process that fired it, the session, the
+verb, the words drawn and what the bar answered. A hook line and the CLI
+line it caused share a short trace id, so a READY that appears out of
+nowhere can be traced to the `claude` process and folder it came from.
+
+```bash
+busybar-agents log           # the last 40 events; -f follows, --json gives the raw lines
+busybar-agents panel         # control panel at http://127.0.0.1:8765
+```
+
+<p align="center">
+  <img src="img/panel.png" width="720" alt="The panel: both screens live, status tiles, hands, controls and the event log">
+</p>
+
+The panel shows both screens as the bar draws them, the hands, the wheel
+switch, the settings in effect and the log as it grows. Every verb can be
+sent from the page, ASK and CHOOSE included, and the wheel and buttons can
+be pressed from software, so the whole path can be tried without an agent.
+It stays out of the way: hooks keep talking to the bar directly, and the
+page draws only when you press a button. It listens on localhost.
+
+An installed plugin runs the pinned command line through `uvx`, so hooks
+log through whichever version that is. To log from a clone instead, put
+its `busybar-agents` on your `PATH` or set `BUSYBAR_AGENTS_BIN` to
+`uv run --project /path/to/busybar-agents busybar-agents`.
+
 ## Settings
 
 | Variable | Default | Meaning |
@@ -112,7 +141,7 @@ Same hands, same wheel. The switch is
 | --- | --- | --- |
 | `BUSYBAR_TTL` | `1800` | Seconds a hand may stay up |
 | `BUSYBAR_DONE_SECONDS` | `8` | How long DONE stays |
-| `BUSYBAR_HELLO_SECONDS` | `4` | Ready blip at session start, `0` disables |
+| `BUSYBAR_HELLO_SECONDS` | `4` | READY and the session's name at session start, `0` disables |
 | `BUSYBAR_ASK_TIMEOUT` | `20` | Seconds to wait for the wheel |
 | `BUSYBAR_GO_SECONDS` | `8` | How long GO? stays |
 | `BUSYBAR_DRY_RUN` | off | `1` prints payloads instead of drawing |
@@ -131,13 +160,17 @@ busybar-agents done   --agent claude --session 1a2b3c4d --project api
 busybar-agents ask    --question "ALLOW?" --detail "Bash: npm test"   # allow, deny or timeout
 busybar-agents choose --title Framework --option React --option Vue    # the label, cancel or timeout
 busybar-agents wheel  on | off | status                                 # what /busybar-agents:wheel runs
+busybar-agents say    "Hello Zach" --color red --detail "lunch?" --seconds 10 --sound reminder   # any message, any colour; --no-icon for the full strip
+busybar-agents play   reminder | event                                  # a stock sound
 busybar-agents hello | status | redraw | clear
+busybar-agents log    -n 40 | -f | --json                                   # events.jsonl, readable
+busybar-agents panel  --port 8765 | --no-browser                            # the control panel
 ```
 
 Each adapter is one standard-library script that turns hook events into
 these verbs. Hands are recorded in one JSON file, one per agent and
 session, and the strip is redrawn from the whole list, so several sessions
-share it. Everything is filed under the application name `busybar-agents`
+share it. Every event and every call lands in `events.jsonl` next to it. Everything is filed under the application name `busybar-agents`
 and carries a timeout; icons are inline bitmaps, sounds are stock, nothing
 is uploaded to the bar.
 

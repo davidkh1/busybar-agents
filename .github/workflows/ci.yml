@@ -32,5 +32,7 @@ jobs:
         run: |
           echo '{"hook_event_name":"Notification","notification_type":"permission_prompt","session_id":"ci000000","cwd":"."}' | python3 adapters/claude-code/hook.py
           test -f "$BUSYBAR_STATE"
+          test -f "${BUSYBAR_STATE%/*}/events.jsonl"
+          uv run busybar-agents log
       - name: Plugin files are valid JSON
         run: python3 -c "import json; [json.load(open(p)) for p in ('adapters/claude-code/.claude-plugin/plugin.json', 'adapters/claude-code/hooks/hooks.json')]"

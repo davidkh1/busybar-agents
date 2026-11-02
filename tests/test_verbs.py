@@ -136,3 +136,13 @@ def test_play_is_just_a_sound(tmp_path):
     run(hands, bar, "play")
     run(hands, bar, "play", "event")
     assert bar.calls == [("play", "reminder"), ("play", "event")]
+
+
+def test_sounds_lists_the_stock_names_without_a_bar(capsys, monkeypatch):
+    from busybar_agents.cli import main
+
+    monkeypatch.setenv("BUSYBAR_DRY_RUN", "1")
+    assert main(["sounds"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert [line.split()[0] for line in lines] == ["event", "reminder", "volume"]
+    assert all(line.split()[1].endswith(".snd") for line in lines)

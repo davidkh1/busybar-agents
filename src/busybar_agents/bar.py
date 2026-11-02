@@ -14,7 +14,7 @@ import sys
 from typing import Any, Sequence
 
 from busylib import AsyncBusyBar
-from busylib.features import notification
+from busylib.features import assets, notification
 
 from .config import APP_NAME, Config
 from .state import Hand
@@ -321,11 +321,18 @@ class Bar:
             print(json.dumps({"play": sound}))
             self._step("play", f"play:{sound}:dry-run")
             return
-        asset = await notification.resolve_sound(self.client, sound, application_name=APP_NAME)
+        try:
+            asset = await notification.resolve_sound(self.client, sound, application_name=APP_NAME)
+        except ValueError:
+            # busylib lists other applications' uploads as app/name but resolves only our own; play those by folder.
+            uploads = [a for a in await assets.discover_assets(self.client) if a.kind == "sound" and a.is_upload]
+            asset = next((a for a in uploads if notification.upload_for(a) == sound), None)
+            if asset is None:
+                raise
         await self.client.audio_play(
             stock_path=None if asset.is_upload else asset.reference,
             path=asset.reference if asset.is_upload else None,
-            application_name=APP_NAME,
+            application_name=asset.application or APP_NAME,
             timeout=REQUEST_TIMEOUT,
         )
         self._step("play", f"play:{sound}")
@@ -375,6 +382,20 @@ class Bar:
             return
         await self.client.input(InputKey(key))
         self._step("input", f"input:{key}")
+
+    async def sounds(self) -> list[tuple[str, str]]:
+        """Every sound the bar can play, as (name to pass to --sound, file on the bar). Stock names first."""
+        stock = [(name, path) for name, path in notification.STOCK_SOUNDS.items()]
+        if self.cfg.dry_run:
+            return stock
+        found = []
+        for asset in await assets.discover_assets(self.client):
+            if asset.kind != "sound":
+                continue
+            name = asset.name if not asset.is_upload or asset.application == APP_NAME else notification.upload_for(asset)
+            found.append((name, asset.device_path if asset.is_upload else asset.reference))
+        known = {path for _, path in stock}
+        return stock + sorted(pair for pair in found if pair[1] not in known)
 
     async def screen(self, display: int = 0) -> bytes:
         """The live pixels of the front (0, 72x16) or back (1, 160x80) display: RGB, three bytes each."""

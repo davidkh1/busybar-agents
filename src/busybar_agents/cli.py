@@ -6,8 +6,9 @@
     busybar-agents ask    --question "ALLOW?" --detail "Bash: npm test"    # prints allow|deny|timeout
     busybar-agents choose --title Framework --option React --option Vue     # prints label|cancel|timeout
     busybar-agents hello  --agent claude --project api
-    busybar-agents say    "Hello Zach" --color red [--detail "lunch?"] [--seconds 10] [--sound reminder] [--no-icon]
+    busybar-agents say    "LUNCH" --color red [--detail "12:30 at the cafe"] [--seconds 10] [--sound reminder] [--no-icon]
     busybar-agents play   reminder                                           # a stock sound
+    busybar-agents sounds                                                    # what --sound accepts
     busybar-agents wheel  on | off | status                                  # answer from the wheel, every session
     busybar-agents status | redraw | clear
     busybar-agents log    [-n 40] [-f] [--json]                              # who fired what, what the bar said
@@ -76,6 +77,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("play", help="play a stock sound")
     p.add_argument("sound", nargs="?", default="reminder", help="reminder, event, ...")
+
+    sub.add_parser("sounds", help="list the sounds the bar can play, for --sound and BUSYBAR_SOUND")
 
     p = sub.add_parser("ask", help="yes/no on the wheel; prints allow, deny or timeout")
     _add_identity(p)
@@ -230,6 +233,20 @@ async def status(cfg: Config) -> int:
     return 0
 
 
+async def sounds(cfg: Config) -> int:
+    """Name and file of every sound on the bar; the name is what --sound takes."""
+    try:
+        async with Bar(cfg) as bar:
+            found = await bar.sounds()
+    except Exception as err:
+        print_error(f"bar not reachable at {cfg.addr}: {err}")
+        return 1
+    width = max(len(name) for name, _ in found)
+    for name, path in found:
+        print(f"{name:{width}}  {path}")
+    return 0
+
+
 def show_log(args: argparse.Namespace, cfg: Config) -> int:
     path = log_path(cfg.state_path)
     events = read(path, args.lines)
@@ -250,6 +267,8 @@ async def _run(args: argparse.Namespace, cfg: Config) -> int:
         return 0
     if args.command == "status":
         return await status(cfg)
+    if args.command == "sounds":
+        return await sounds(cfg)
     answer = await execute(args, cfg)
     if answer is not None:
         print(answer)

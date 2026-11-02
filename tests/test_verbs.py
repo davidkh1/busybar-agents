@@ -121,3 +121,18 @@ def test_wheel_switch_is_a_file_beside_the_hands(tmp_path, monkeypatch):
     monkeypatch.setenv("BUSYBAR_GO", "0")
     assert "BUSYBAR_GO in the environment wins" in run(hands_file, None, "wheel", "off", cfg=cfg)
     assert (tmp_path / "wheel.json").read_text() == '{"ask": false, "go": false}'
+
+
+def test_say_is_a_blip_with_an_optional_sound(tmp_path):
+    bar, hands = FakeBar(), HandsFile(tmp_path / "h.json")
+    run(hands, bar, "say", "Hello Zach", "--color", "red", "--detail", "lunch?")
+    run(hands, bar, "say", "Hi", "--sound", "event")
+    assert bar.calls == [("draw", ["Hello Zach", "lunch?"]), ("draw", ["Hi"]), ("play", "event")]
+    assert hands.load() == []
+
+
+def test_play_is_just_a_sound(tmp_path):
+    bar, hands = FakeBar(), HandsFile(tmp_path / "h.json")
+    run(hands, bar, "play")
+    run(hands, bar, "play", "event")
+    assert bar.calls == [("play", "reminder"), ("play", "event")]

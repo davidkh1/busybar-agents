@@ -1,6 +1,6 @@
 import time
 
-from busybar_agents.bar import CLAUDE_ORANGE, MASCOT, PROMPT_GLYPH, SESSION_COLORS, ask_payload, choice_payload, done_payload, hands_payload, hello_payload, resolve_color, texts
+from busybar_agents.bar import CLAUDE_ORANGE, MASCOT, PROMPT_GLYPH, SESSION_COLORS, ask_payload, choice_payload, done_payload, hands_payload, hello_payload, resolve_color, say_payload, texts
 from busybar_agents.config import APP_NAME, Config
 from busybar_agents.state import Hand
 
@@ -103,3 +103,22 @@ def test_many_hands_share_a_color_only_when_they_agree():
     assert same["led_notification_color"] == SESSION_COLORS["pink"]
     mixed = hands_payload([hand(color="pink"), hand(session="s2", color="blue")], Config())
     assert mixed["led_notification_color"] == CLAUDE_ORANGE
+
+
+def test_say_paints_the_message_in_the_colour_for_the_given_seconds():
+    payload = say_payload("claude", "Hello Zach", "lunch?", 10, Config(), color="red")
+    icon, head, detail = payload["elements"]
+    assert icon["type"] == "xpmbitmap" and "#FF3B30" in icon["data"]
+    assert head["text"] == "Hello Zach" and head["color"] == "#FF3B30FF"
+    assert payload["led_notification_color"] == "#FF3B30FF"
+    assert {e["timeout"] for e in payload["elements"]} == {10}
+    assert detail["text"] == "lunch?"
+
+
+def test_say_without_icon_uses_the_whole_strip():
+    payload = say_payload("claude", "Hello Zach", "", 5, Config(), color="#00FF00", icon=False)
+    (head,) = payload["elements"]
+    assert head["x"] == 0 and head["align"] == "mid_left" and head["color"] == "#00FF00FF"
+    assert "scroll_rate" not in head  # ten bold characters fit 72 px
+    long = say_payload("claude", "A rather long headline", "", 5, Config(), icon=False)["elements"][0]
+    assert long["width"] == 72 and long["scroll_rate"] > 0

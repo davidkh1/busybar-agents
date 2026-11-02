@@ -139,11 +139,12 @@ def icon_element(agent: str, timeout: int, mood: str = "ready", color: str | Non
     return {"id": "10", "type": "xpmbitmap", "x": 0, "y": 8, "align": "mid_left", "display": "front", "timeout": timeout, "data": data}
 
 
-def text_element(element_id: str, text: str, font: str, color: str, y: int, align: str, timeout: int) -> dict[str, Any]:
+def text_element(element_id: str, text: str, font: str, color: str, y: int, align: str, timeout: int, x: int = TEXT_X) -> dict[str, Any]:
+    """A line of text; from ``x`` to the right edge. Lines too long for that room scroll."""
     element: dict[str, Any] = {
         "id": element_id,
         "type": "text",
-        "x": TEXT_X,
+        "x": x,
         "y": y,
         "align": align,
         "display": "front",
@@ -152,8 +153,9 @@ def text_element(element_id: str, text: str, font: str, color: str, y: int, alig
         "font": font,
         "color": color,
     }
-    if len(text) > SCROLL_THRESHOLD_CHARS.get(font, 12):
-        element.update(width=TEXT_WIDTH, scroll_rate=SCROLL_RATE, scroll_start_delay=SCROLL_START_DELAY_MS, scroll_repeat_delay=SCROLL_REPEAT_DELAY_MS)
+    width = FRONT_WIDTH - x
+    if len(text) > SCROLL_THRESHOLD_CHARS.get(font, 12) * width // TEXT_WIDTH:
+        element.update(width=width, scroll_rate=SCROLL_RATE, scroll_start_delay=SCROLL_START_DELAY_MS, scroll_repeat_delay=SCROLL_REPEAT_DELAY_MS)
     return element
 
 
@@ -199,6 +201,17 @@ def choice_payload(agent: str, title: str, options: Sequence[str], index: int, t
 
 def ask_payload(agent: str, question: str, detail: str, timeout: int, cfg: Config, color: str | None = None) -> dict[str, Any]:
     return notice(agent, question, detail, timeout, cfg, mood="up", color=color)
+
+
+def say_payload(agent: str, text: str, detail: str, seconds: int, cfg: Config, color: str | None = None, icon: bool = True) -> dict[str, Any]:
+    """A free message: bold headline in the colour, small detail line; the agent's mascot unless ``icon`` is off."""
+    if icon:
+        return notice(agent, text, detail, seconds, cfg, color=color)
+    color = resolve_color(agent, color)
+    elements = [text_element("11", sanitize(text, 24) or "HELLO", "bold", color, -1 if detail else 0, "top_left" if detail else "mid_left", seconds, x=0)]
+    if sanitize(detail):
+        elements.append(text_element("12", sanitize(detail), "tiny", IVORY, 15, "bottom_left", seconds, x=0))
+    return {"application_name": APP_NAME, "priority": cfg.priority, "led_notification_color": color, "elements": elements}
 
 
 def texts(payload: dict[str, Any]) -> list[str]:

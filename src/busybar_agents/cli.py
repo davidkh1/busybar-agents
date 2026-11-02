@@ -6,6 +6,8 @@
     busybar-agents ask    --question "ALLOW?" --detail "Bash: npm test"    # prints allow|deny|timeout
     busybar-agents choose --title Framework --option React --option Vue     # prints label|cancel|timeout
     busybar-agents hello  --agent claude --project api
+    busybar-agents say    "Hello Zach" --color red [--detail "lunch?"] [--seconds 10] [--sound reminder] [--no-icon]
+    busybar-agents play   reminder                                           # a stock sound
     busybar-agents wheel  on | off | status                                  # answer from the wheel, every session
     busybar-agents status | redraw | clear
     busybar-agents log    [-n 40] [-f] [--json]                              # who fired what, what the bar said
@@ -27,13 +29,13 @@ import time
 from pathlib import Path
 
 from . import __version__
-from .bar import Bar, done_payload, hands_payload, hello_payload, print_error
+from .bar import SESSION_COLORS, Bar, done_payload, hands_payload, hello_payload, print_error, say_payload
 from .config import Config
 from .log import follow, format_event, log_path, read, record
 from .state import Hand, HandsFile, WheelFile
 
 # Arguments worth repeating in the event log.
-NOTED = ("agent", "session", "project", "reason", "color", "question", "detail", "title", "option", "message", "timeout")
+NOTED = ("agent", "session", "project", "reason", "color", "question", "detail", "title", "option", "message", "timeout", "text", "seconds", "sound")
 
 
 def _add_identity(parser: argparse.ArgumentParser) -> None:
@@ -62,6 +64,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("hello", help="short READY blip with the session's name")
     _add_identity(p)
+
+    p = sub.add_parser("say", help="a message on the bar, in a colour")
+    p.add_argument("text", help="the headline, bold")
+    p.add_argument("--detail", default="", help="small second line")
+    p.add_argument("--color", default=None, help=f"{', '.join(SESSION_COLORS)}, or #RRGGBB; default is the agent's")
+    p.add_argument("--agent", default="claude", help="whose mascot to show (default claude)")
+    p.add_argument("--seconds", type=int, default=10, help="how long it stays (default 10)")
+    p.add_argument("--sound", default=None, help="play a stock sound too, e.g. reminder or event")
+    p.add_argument("--no-icon", action="store_true", help="text across the whole strip, no mascot")
+
+    p = sub.add_parser("play", help="play a stock sound")
+    p.add_argument("sound", nargs="?", default="reminder", help="reminder, event, ...")
 
     p = sub.add_parser("ask", help="yes/no on the wheel; prints allow, deny or timeout")
     _add_identity(p)
@@ -120,6 +134,12 @@ async def perform(args: argparse.Namespace, cfg: Config, hands_file: HandsFile, 
     elif args.command == "hello":
         if cfg.hello_seconds > 0:
             await bar.draw(hello_payload(args.agent, args.project, cfg, args.color))
+    elif args.command == "say":
+        await bar.draw(say_payload(args.agent, args.text, args.detail, max(1, args.seconds), cfg, args.color, icon=not args.no_icon))
+        if args.sound:
+            await bar.play(args.sound)
+    elif args.command == "play":
+        await bar.play(args.sound)
     elif args.command in ("ask", "choose"):
         timeout = args.timeout or cfg.ask_timeout
         if args.command == "ask":

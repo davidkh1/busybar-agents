@@ -160,6 +160,8 @@ busybar-agents done   --agent claude --session 1a2b3c4d --project api
 busybar-agents ask    --question "ALLOW?" --detail "Bash: npm test"   # allow, deny or timeout
 busybar-agents choose --title Framework --option React --option Vue    # the label, cancel or timeout
 busybar-agents wheel  on | off | status                                 # what /busybar-agents:wheel runs
+busybar-agents say    "Hello Zach" --color red --detail "lunch?" --seconds 10 --sound reminder   # any message, any colour; --no-icon for the full strip
+busybar-agents play   reminder | event                                  # a stock sound
 busybar-agents hello | status | redraw | clear
 busybar-agents log    -n 40 | -f | --json                                   # events.jsonl, readable
 busybar-agents panel  --port 8765 | --no-browser                            # the control panel

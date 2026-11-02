@@ -67,7 +67,7 @@ def test_ask_prints_the_answer_and_restores_the_strip(tmp_path):
 def test_hello_is_a_blip_that_changes_no_state(tmp_path):
     bar, hands = FakeBar(), HandsFile(tmp_path / "h.json")
     run(hands, bar, "hello", "--agent", "claude", "--project", "api")
-    assert bar.calls == [("draw", ["CLAUDE", "ready"])]
+    assert bar.calls == [("draw", ["READY", "api"])]
     assert hands.load() == []
 
 

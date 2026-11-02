@@ -55,7 +55,7 @@ def test_done_hello_and_ask_expire_on_their_own():
     assert all(e["timeout"] == 6 for e in done_payload(hand(), "DONE", cfg)["elements"])
     assert all(e["timeout"] == 3 for e in hello_payload("claude", "api", cfg)["elements"])
     assert all(e["timeout"] == 15 for e in ask_payload("claude", "ALLOW?", "Bash: npm test", 15, cfg)["elements"])
-    assert texts(hello_payload("claude", "api", cfg)) == ["CLAUDE", "ready"]
+    assert texts(hello_payload("claude", "api", cfg)) == ["READY", "api"]
 
 
 def test_long_lines_scroll_after_a_pause_and_short_lines_do_not():

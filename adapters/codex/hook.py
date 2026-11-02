@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Codex CLI hook bridge: one event in on stdin, one busybar-agents call out.
 
-Standard library only. Never blocks Codex on a missing bar or CLI.
+Standard library only. Never blocks Codex on a missing bar or CLI. Every
+event leaves a line in events.jsonl beside the hands file, with the process
+that fired it; ``busybar-agents log`` and ``busybar-agents panel`` read it.
 
   SessionStart (startup, resume)              hello
   PermissionRequest                           raise; BUSYBAR_ASK=1: ALLOW? on the wheel, decision returned
@@ -20,6 +22,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 AGENT = "codex"
@@ -66,9 +69,12 @@ def run(cmd: list[str], timeout: float) -> str:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired) as err:
         print(f"busybar-agents: {err}", file=sys.stderr)
+        log_event(src="hook", agent=AGENT, trace=os.environ.get("BUSYBAR_TRACE"), error=f"{type(err).__name__}: {err}"[:300])
         return ""
-    if proc.returncode != 0 and proc.stderr:
-        print(proc.stderr.strip()[:500], file=sys.stderr)
+    if proc.returncode != 0:
+        if proc.stderr:
+            print(proc.stderr.strip()[:500], file=sys.stderr)
+        log_event(src="hook", agent=AGENT, trace=os.environ.get("BUSYBAR_TRACE"), error=f"exit {proc.returncode}: {proc.stderr.strip()[:300]}".rstrip(": "))
     return proc.stdout
 
 
@@ -104,6 +110,42 @@ def hand_is_up(session: str) -> bool:
     return any(h.get("agent") == AGENT and h.get("session") == session for h in hands)
 
 
+LOG_NAME = "events.jsonl"
+LOG_MAX_BYTES = 2_000_000
+
+
+def log_event(**fields) -> None:
+    """One JSON line in events.jsonl beside the hands file, the shape busybar_agents.log reads. Never raises."""
+    path = state_path().with_name(LOG_NAME)
+    entry = {"t": round(time.time(), 3), **{key: value for key, value in fields.items() if value is not None}}
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.stat().st_size > LOG_MAX_BYTES:
+            os.replace(path, path.with_name(path.name + ".1"))
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, separators=(",", ":"), default=str) + "\n")
+    except OSError:
+        pass
+
+
+def parents(limit: int = 5) -> list:
+    """The commands of this process's ancestors, nearest first; the agent that fired the hook is among them."""
+    try:
+        table = subprocess.run(["ps", "axo", "pid=,ppid=,command="], capture_output=True, text=True, timeout=3).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    rows = {}
+    for line in table.splitlines():
+        parts = line.split(None, 2)
+        if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit():
+            rows[int(parts[0])] = (int(parts[1]), parts[2].strip())
+    chain, pid = [], os.getppid()
+    while pid > 1 and pid in rows and len(chain) < limit:
+        pid, command = rows[pid]
+        chain.append(command[:120])
+    return chain
+
+
 def main() -> int:
     try:
         event = json.load(sys.stdin)
@@ -117,39 +159,66 @@ def main() -> int:
     project = Path(event.get("cwd") or os.getcwd()).name or "project"
     common = ["--agent", AGENT, "--session", session, "--project", project]
 
+    trace = os.urandom(3).hex()  # shared by this hook's log lines and the CLI's
+    os.environ["BUSYBAR_TRACE"] = trace
+    identity = {"src": "hook", "trace": trace, "agent": AGENT, "event": name, "session": session, "project": project,
+                "cwd": event.get("cwd"), "pid": os.getpid(), "term": os.environ.get("TERM_PROGRAM")}
+    lineage: dict = {}
+
+    def note(**fields) -> None:
+        """One log line: who fired this event and what the hook made of it."""
+        if "parents" not in lineage:
+            lineage["parents"] = parents()
+        log_event(**identity, parents=lineage["parents"], **fields)
+
     cmd = cli_command()
     if cmd is None:
+        note(error="CLI not found; install it or set BUSYBAR_AGENTS_BIN")
         print("busybar-agents: CLI not found; install it or set BUSYBAR_AGENTS_BIN", file=sys.stderr)
         return 0
 
     if name == "SessionStart":
-        if event.get("source", "startup") in ("startup", "resume"):
+        source = event.get("source", "startup")
+        if source in ("startup", "resume"):
+            note(verb="hello", source=source)
             run(cmd + ["hello", *common], timeout=15)
+        else:
+            note(skip="only startup and resume say hello", source=source)
     elif name == "PermissionRequest":
-        detail = tool_summary(event.get("tool_name", ""), event.get("tool_input") or {})
+        tool = event.get("tool_name", "")
+        detail = tool_summary(tool, event.get("tool_input") or {})
         if not flag("BUSYBAR_ASK"):
+            note(verb="raise", tool=tool, detail=detail)
             run(cmd + ["raise", *common, "--reason", "permission?"], timeout=15)
             return 0
+        note(verb="ask", tool=tool, detail=detail)
         answer = run(cmd + ["ask", *common, "--question", "ALLOW?", "--detail", detail], timeout=35).strip()
         if answer in ("allow", "deny"):
+            note(decision=answer)
             decision = {"behavior": answer}
             if answer == "deny":
                 decision["message"] = "Denied from the BUSY Bar."
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": decision}}))
         else:
+            note(verb="raise", tool=tool, result=answer or None)
             run(cmd + ["raise", *common, "--reason", "permission?"], timeout=15)
     elif name in ("UserPromptSubmit", "Interrupt", "SessionEnd"):
+        note(verb="lower")
         run(cmd + ["lower", *common], timeout=15)
     elif name == "PostToolUse":
         if hand_is_up(session):
+            note(verb="lower")
             run(cmd + ["lower", *common], timeout=15)
     elif name == "Stop":
         if flag("BUSYBAR_GO") and not event.get("stop_hook_active") and ends_with_question(event.get("last_assistant_message") or ""):
             seconds = os.environ.get("BUSYBAR_GO_SECONDS", "8")
+            note(verb="ask", detail="GO?")
             answer = run(cmd + ["ask", *common, "--question", "GO?", "--detail", "wheel = yes", "--timeout", seconds], timeout=40).strip()
             if answer == "allow":
+                note(decision="go ahead")
                 print(json.dumps({"decision": "block", "reason": "Yes, go ahead with what you proposed. (answered from the BUSY Bar)"}))
                 return 0
+        note(verb="done")
         run(cmd + ["done", *common], timeout=15)
     return 0
 

@@ -142,3 +142,66 @@ def test_wheel_command_runs_the_verb_through_the_cli(monkeypatch, capsys):
     assert hook.main() == 0
     assert calls == [["fake-cli", "wheel", "on"]]
     assert capsys.readouterr().out.strip() == "wheel on: ALLOW?, choices and GO? come to the bar"
+
+
+def log_lines():
+    import os
+
+    path = Path(os.environ["BUSYBAR_STATE"]).with_name("events.jsonl")
+    return [json.loads(line) for line in path.read_text().splitlines()]
+
+
+def test_every_hook_event_is_logged_with_a_trace(monkeypatch, tmp_path):
+    import os
+
+    seen = {}
+
+    def fake_run(cmd, timeout):
+        seen["trace"] = os.environ.get("BUSYBAR_TRACE")
+        return ""
+
+    monkeypatch.setattr(hook, "cli_command", lambda: ["fake-cli"])
+    monkeypatch.setattr(hook, "run", fake_run)
+    monkeypatch.setenv("TERM_PROGRAM", "iTerm.app")
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(event(tmp_path, hook_event_name="SessionStart", source="startup"))))
+    assert hook.main() == 0
+    (line,) = log_lines()
+    assert line["src"] == "hook" and line["event"] == "SessionStart" and line["source"] == "startup" and line["verb"] == "hello"
+    assert line["agent"] == "claude" and line["session"] == "abc" and line["project"] == "my-repo" and line["term"] == "iTerm.app"
+    assert line["trace"] == seen["trace"] and len(line["trace"]) == 6
+    assert isinstance(line["parents"], list) and line["pid"] > 0
+
+
+def test_skips_decisions_and_a_missing_cli_are_logged(monkeypatch, capsys, tmp_path):
+    ev = event(tmp_path, hook_event_name="PreToolUse", tool_name="AskUserQuestion", tool_input={"questions": [QUESTION]})
+    monkeypatch.delenv("BUSYBAR_ASK", raising=False)
+    drive(monkeypatch, capsys, ev, [])
+    assert log_lines()[-1]["skip"] == "wheel off"
+    drive(monkeypatch, capsys, ev, ["Vue\n"], {"BUSYBAR_ASK": "1"})
+    assert [(l.get("verb"), l.get("decision"), l.get("result")) for l in log_lines()[-2:]] == [("choose", None, None), (None, "answered", "Vue")]
+    assert len({l["trace"] for l in log_lines()[-2:]}) == 1
+    monkeypatch.setattr(hook, "cli_command", lambda: None)
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(event(tmp_path, hook_event_name="SessionEnd"))))
+    assert hook.main() == 0
+    assert "CLI not found" in log_lines()[-1]["error"]
+
+
+def test_a_failing_cli_leaves_an_error_line(monkeypatch):
+    import sys
+
+    monkeypatch.setenv("BUSYBAR_TRACE", "t3st00")
+    assert hook.run([sys.executable, "-c", "import sys; sys.stderr.write('boom'); sys.exit(3)"], timeout=10) == ""
+    assert hook.run(["/nonexistent/busybar-agents"], timeout=5) == ""
+    errors = [line["error"] for line in log_lines()]
+    assert errors[0] == "exit 3: boom" and "FileNotFoundError" in errors[1]
+    assert all(line["trace"] == "t3st00" for line in log_lines())
+
+
+def test_parents_start_with_the_process_that_ran_us():
+    import subprocess
+    import sys
+
+    code = (f"import importlib.util, json; spec = importlib.util.spec_from_file_location('h', {str(HOOK)!r}); "
+            "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m); print(json.dumps(m.parents()))")
+    chain = json.loads(subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=30).stdout)
+    assert chain and ("python" in chain[0].lower() or "pytest" in chain[0].lower())  # this test process
